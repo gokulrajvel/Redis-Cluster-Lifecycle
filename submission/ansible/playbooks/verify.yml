@@ -1,0 +1,23 @@
+---
+- name: Verify Redis Cluster
+  hosts: redis-node-1
+  become: yes
+  tasks:
+    - name: Run cluster check
+      command: redis-cli --cluster check 10.10.0.11:6379
+      register: cluster_check
+      changed_when: false
+
+    - name: Display Cluster Check Output
+      debug:
+        msg: "{{ cluster_check.stdout_lines }}"
+
+    - name: Run cluster info
+      command: redis-cli cluster info
+      register: cluster_info
+      changed_when: false
+
+    - name: Display Cluster Info
+      debug:
+        msg: "{{ cluster_info.stdout_lines }}"
+...

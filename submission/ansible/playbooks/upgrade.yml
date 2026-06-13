@@ -1,0 +1,23 @@
+---
+- name: Rolling Upgrade Redis Cluster
+  hosts: redis_nodes
+  serial: 1
+  become: yes
+  roles:
+    - redis
+  tasks:
+    - name: Restart Redis to apply upgrade (Manual)
+      shell: |
+        pkill -f "redis-server" || true
+        sleep 2
+        redis-server "{{ redis_conf_dir }}/redis.conf"
+      become: yes
+      become_user: "{{ redis_user }}"
+      when: ansible_service_mgr != 'systemd'
+
+    - name: Restart Redis to apply upgrade (Systemd)
+      systemd:
+        name: redis
+        state: restarted
+      when: ansible_service_mgr == 'systemd'
+...

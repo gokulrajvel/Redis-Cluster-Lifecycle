@@ -1,0 +1,14 @@
+---
+redis_version: "7.0.15"
+redis_download_url: "https://download.redis.io/releases/redis-{{ redis_version }}.tar.gz"
+redis_port: 6379
+redis_bind: "0.0.0.0"
+redis_dir: "/var/lib/redis"
+redis_conf_dir: "/etc/redis"
+redis_log_dir: "/var/log/redis"
+redis_user: "redis"
+redis_group: "redis"
+redis_cluster_enabled: "yes"
+redis_cluster_config_file: "nodes.conf"
+redis_cluster_node_timeout: 5000
+redis_appendonly: "yes"

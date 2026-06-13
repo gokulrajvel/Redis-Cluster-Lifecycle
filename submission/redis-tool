@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+import os
+import sys
+import shutil
+import re
+import subprocess
+
+# Define directory structures relative to script location
+SUBMISSION_DIR = os.path.dirname(os.path.abspath(__file__))
+ANSIBLE_DIR = os.path.join(SUBMISSION_DIR, "ansible")
+
+def check_prerequisites():
+    """Verify Docker/Podman and Ansible 2.14+ are installed on the system."""
+    # 1. Check Docker or Podman
+    docker_exists = shutil.which("docker") is not None
+    podman_exists = shutil.which("podman") is not None
+    if not (docker_exists or podman_exists):
+        print("Error: Neither Docker nor Podman was found in the PATH. Please install one of them.")
+        sys.exit(1)
+
+    # 2. Check Ansible 2.14+
+    ansible_exists = shutil.which("ansible-playbook") is not None
+    if not ansible_exists:
+        print("Error: ansible-playbook was not found in the PATH. Please install Ansible.")
+        sys.exit(1)
+
+    try:
+        res = subprocess.run(["ansible-playbook", "--version"], capture_output=True, text=True, check=True)
+        first_line = res.stdout.splitlines()[0]
+        # Regex to capture version number inside Ansible version output
+        match = re.search(r'(?:core\s+)?(\d+\.\d+(?:\.\d+)?)', first_line)
+        if match:
+            version_str = match.group(1)
+            version_parts = [int(x) for x in version_str.split('.')]
+            while len(version_parts) < 3:
+                version_parts.append(0)
+            if version_parts < [2, 14, 0]:
+                print(f"Error: Ansible version {version_str} is below the required 2.14+.")
+                sys.exit(1)
+        else:
+            print("Warning: Could not parse Ansible version format. Proceeding anyway.")
+    except Exception as e:
+        print(f"Error checking Ansible version: {e}")
+        sys.exit(1)
+
+def run_playbook(cmd, log_filename=None):
+    """Executes the ansible-playbook command and streams the output to stdout and log file."""
+    print(f"Running command: {' '.join(cmd)}")
+    
+    log_file_path = None
+    if log_filename:
+        output_dir = os.path.join(SUBMISSION_DIR, "output")
+        os.makedirs(output_dir, exist_ok=True)
+        log_file_path = os.path.join(output_dir, log_filename)
+        print(f"Logging output to {log_file_path}")
+
+    if log_file_path:
+        with open(log_file_path, "w") as f:
+            process = subprocess.Popen(
+                cmd,
+                cwd=ANSIBLE_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            # Stream output live
+            for line in process.stdout:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                f.write(line)
+            process.wait()
+            return process.returncode
+    else:
+        result = subprocess.run(cmd, cwd=ANSIBLE_DIR)
+        return result.returncode
+
+def main():
+    check_prerequisites()
+
+    import argparse
+    parser = argparse.ArgumentParser(description="Redis Cluster Management CLI Tool")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # 1. provision
+    prov_parser = subparsers.add_parser("provision", help="Provision Redis nodes and form the cluster")
+    prov_parser.add_argument("--version", default="7.0.15", help="Redis version to deploy")
+    prov_parser.add_argument("--masters", type=int, default=3, help="Number of master nodes")
+    prov_parser.add_argument("--replicas-per-master", type=int, default=1, help="Replicas per master")
+
+    # 2. status
+    subparsers.add_parser("status", help="Check status of the Redis Cluster nodes")
+
+    # 3. upgrade
+    up_parser = subparsers.add_parser("upgrade", help="Perform a rolling upgrade of the Redis Cluster")
+    up_parser.add_argument("--target-version", default="7.2.6", help="Target Redis version to upgrade to")
+    up_parser.add_argument("--strategy", default="rolling", choices=["rolling"], help="Upgrade strategy")
+
+    # 4. data (nested commands)
+    data_parser = subparsers.add_parser("data", help="Redis data operations")
+    data_subparsers = data_parser.add_subparsers(dest="data_command", required=True)
+    
+    seed_parser = data_subparsers.add_parser("seed", help="Seed test data into the cluster")
+    seed_parser.add_argument("--keys", type=int, default=1000, help="Number of keys to seed")
+    
+    data_subparsers.add_parser("verify", help="Verify that data routes and retrieves correctly")
+
+    # 5. verify
+    verify_parser = subparsers.add_parser("verify", help="Verify the cluster health and topology")
+    verify_parser.add_argument("--full", action="store_true", help="Perform a full verification check")
+
+    args = parser.parse_args()
+
+    # Determine command execution list and log files
+    cmd = []
+    log_filename = None
+
+    if args.command == "provision":
+        cmd = [
+            "ansible-playbook",
+            "-i", "inventory/hosts.ini",
+            "playbooks/provision.yml",
+            "-e", f"redis_version={args.version}",
+            "-e", f"cluster_replicas={args.replicas_per_master}"
+        ]
+        log_filename = "provision_output.txt"
+
+    elif args.command == "status":
+        cmd = [
+            "ansible-playbook",
+            "-i", "inventory/hosts.ini",
+            "playbooks/status.yml"
+        ]
+        log_filename = "status_output.txt"
+
+    elif args.command == "upgrade":
+        cmd = [
+            "ansible-playbook",
+            "-i", "inventory/hosts.ini",
+            "playbooks/upgrade.yml",
+            "-e", f"redis_version={args.target_version}"
+        ]
+        log_filename = "upgrade_output.txt"
+
+    elif args.command == "data" and args.data_command == "seed":
+        cmd = [
+            "ansible-playbook",
+            "-i", "inventory/hosts.ini",
+            "playbooks/seed.yml",
+            "-e", f"num_keys={args.keys}"
+        ]
+        log_filename = "data_seed_output.txt"
+
+    elif args.command == "data" and args.data_command == "verify":
+        cmd = [
+            "ansible-playbook",
+            "-i", "inventory/hosts.ini",
+            "playbooks/data_verify.yml"
+        ]
+        log_filename = "data_verify_output.txt"
+
+    elif args.command == "verify":
+        cmd = [
+            "ansible-playbook",
+            "-i", "inventory/hosts.ini",
+            "playbooks/verify.yml"
+        ]
+        if args.full:
+            cmd.extend(["-e", "full_check=true"])
+        log_filename = "verify_output.txt"
+
+    # Execute
+    return_code = run_playbook(cmd, log_filename)
+    sys.exit(return_code)
+
+if __name__ == "__main__":
+    main()

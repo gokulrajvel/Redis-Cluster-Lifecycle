@@ -1,0 +1,33 @@
+---
+- name: Check Redis Cluster Status
+  hosts: redis_nodes
+  become: yes
+  vars_files:
+    - "../roles/redis/defaults/main.yml"
+  tasks:
+    - name: Check if redis-server process is running
+      command: pgrep -u "{{ redis_user }}" redis-server
+      register: pgrep_output
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Get Redis Cluster Node Info
+      command: redis-cli -p "{{ redis_port }}" cluster info
+      register: cluster_info
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Get Redis Cluster Nodes List
+      command: redis-cli -p "{{ redis_port }}" cluster nodes
+      register: cluster_nodes
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Display Status Results
+      debug:
+        msg:
+          - "Host: {{ inventory_hostname }}"
+          - "Process Running: {{ pgrep_output.rc == 0 }}"
+          - "Cluster Info:\n{{ cluster_info.stdout | default('N/A') }}"
+          - "Cluster Nodes:\n{{ cluster_nodes.stdout | default('N/A') }}"
+...

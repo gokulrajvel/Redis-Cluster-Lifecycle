@@ -1,0 +1,21 @@
+---
+- name: Seed Data into Redis Cluster
+  hosts: redis-node-1
+  become: yes
+  vars:
+    num_keys: 1000
+  tasks:
+    - name: Seed keys in Cluster mode
+      shell: |
+        for i in $(seq 1 {{ num_keys }}); do
+          redis-cli -c SET "key_$i" "value_$i"
+        done
+      args:
+        executable: /bin/bash
+      register: seed_output
+      changed_when: true
+
+    - name: Show Seeding Status
+      debug:
+        msg: "Successfully seeded {{ num_keys }} keys into the cluster."
+...

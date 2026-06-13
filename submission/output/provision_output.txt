@@ -1,0 +1,214 @@
+
+PLAY [Provision Redis Cluster Nodes] *******************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'redis-node-2' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-2]
+[WARNING]: Host 'redis-node-3' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-3]
+[WARNING]: Host 'redis-node-1' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-1]
+[WARNING]: Host 'redis-node-4' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-4]
+[WARNING]: Host 'redis-node-5' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-5]
+[WARNING]: Host 'redis-node-6' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-6]
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-1]
+ok: [redis-node-3]
+ok: [redis-node-5]
+ok: [redis-node-2]
+ok: [redis-node-4]
+ok: [redis-node-6]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-1]
+ok: [redis-node-3]
+ok: [redis-node-4]
+ok: [redis-node-5]
+ok: [redis-node-2]
+ok: [redis-node-6]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-3] => (item=/etc/redis)
+ok: [redis-node-2] => (item=/etc/redis)
+ok: [redis-node-1] => (item=/etc/redis)
+ok: [redis-node-4] => (item=/etc/redis)
+ok: [redis-node-5] => (item=/etc/redis)
+ok: [redis-node-2] => (item=/var/lib/redis)
+ok: [redis-node-1] => (item=/var/lib/redis)
+ok: [redis-node-4] => (item=/var/lib/redis)
+ok: [redis-node-5] => (item=/var/lib/redis)
+ok: [redis-node-3] => (item=/var/lib/redis)
+ok: [redis-node-1] => (item=/var/log/redis)
+ok: [redis-node-3] => (item=/var/log/redis)
+ok: [redis-node-5] => (item=/var/log/redis)
+ok: [redis-node-4] => (item=/var/log/redis)
+ok: [redis-node-2] => (item=/var/log/redis)
+ok: [redis-node-6] => (item=/etc/redis)
+ok: [redis-node-6] => (item=/var/lib/redis)
+ok: [redis-node-6] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+ok: [redis-node-4]
+ok: [redis-node-3]
+ok: [redis-node-1]
+ok: [redis-node-6]
+ok: [redis-node-5]
+ok: [redis-node-2]
+
+TASK [redis : Extract Redis source tarball] ************************************
+changed: [redis-node-4]
+changed: [redis-node-2]
+changed: [redis-node-3]
+changed: [redis-node-5]
+changed: [redis-node-1]
+changed: [redis-node-6]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-2]
+changed: [redis-node-3]
+changed: [redis-node-1]
+changed: [redis-node-4]
+changed: [redis-node-5]
+changed: [redis-node-6]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-1]
+ok: [redis-node-2]
+ok: [redis-node-5]
+ok: [redis-node-4]
+ok: [redis-node-3]
+ok: [redis-node-6]
+
+TASK [redis : Template Redis systemd service file] *****************************
+ok: [redis-node-4]
+ok: [redis-node-2]
+ok: [redis-node-3]
+ok: [redis-node-1]
+ok: [redis-node-5]
+ok: [redis-node-6]
+
+TASK [redis : Force systemd daemon reload] *************************************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: /home/pain/Documents/zohoassignment/submission/ansible/roles/redis/tasks/main.yml:69:9
+
+67   systemd:
+68     daemon_reload: yes
+69   when: ansible_service_mgr == 'systemd'
+           ^ column 9
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+skipping: [redis-node-1]
+skipping: [redis-node-2]
+skipping: [redis-node-3]
+skipping: [redis-node-4]
+skipping: [redis-node-5]
+skipping: [redis-node-6]
+
+TASK [redis : Enable and start Redis service under systemd] ********************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: /home/pain/Documents/zohoassignment/submission/ansible/roles/redis/tasks/main.yml:76:9
+
+74     enabled: yes
+75     state: started
+76   when: ansible_service_mgr == 'systemd'
+           ^ column 9
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+skipping: [redis-node-1]
+skipping: [redis-node-2]
+skipping: [redis-node-3]
+skipping: [redis-node-4]
+skipping: [redis-node-5]
+skipping: [redis-node-6]
+
+TASK [redis : Create run directory for manual mode] ****************************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: /home/pain/Documents/zohoassignment/submission/ansible/roles/redis/tasks/main.yml:85:9
+
+83     group: "{{ redis_group }}"
+84     mode: '0755'
+85   when: ansible_service_mgr != 'systemd'
+           ^ column 9
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [redis-node-1]
+ok: [redis-node-2]
+ok: [redis-node-3]
+ok: [redis-node-4]
+ok: [redis-node-5]
+ok: [redis-node-6]
+
+TASK [redis : Check if Redis is running (manual start check)] ******************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: /home/pain/Documents/zohoassignment/submission/ansible/roles/redis/tasks/main.yml:92:9
+
+90   ignore_errors: yes
+91   changed_when: false
+92   when: ansible_service_mgr != 'systemd'
+           ^ column 9
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+[ERROR]: Task failed: Module failed: non-zero return code
+Origin: /home/pain/Documents/zohoassignment/submission/ansible/roles/redis/tasks/main.yml:87:3
+
+85   when: ansible_service_mgr != 'systemd'
+86
+87 - name: Check if Redis is running (manual start check)
+     ^ column 3
+
+fatal: [redis-node-1]: FAILED! => {"changed": false, "cmd": ["pgrep", "-u", "redis", "redis-server"], "delta": "0:00:00.008177", "end": "2026-06-12 14:45:22.416729", "msg": "non-zero return code", "rc": 1, "start": "2026-06-12 14:45:22.408552", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+...ignoring
+fatal: [redis-node-3]: FAILED! => {"changed": false, "cmd": ["pgrep", "-u", "redis", "redis-server"], "delta": "0:00:00.008928", "end": "2026-06-12 14:45:22.416596", "msg": "non-zero return code", "rc": 1, "start": "2026-06-12 14:45:22.407668", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+...ignoring
+fatal: [redis-node-5]: FAILED! => {"changed": false, "cmd": ["pgrep", "-u", "redis", "redis-server"], "delta": "0:00:00.009187", "end": "2026-06-12 14:45:22.421648", "msg": "non-zero return code", "rc": 1, "start": "2026-06-12 14:45:22.412461", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+...ignoring
+fatal: [redis-node-2]: FAILED! => {"changed": false, "cmd": ["pgrep", "-u", "redis", "redis-server"], "delta": "0:00:00.008576", "end": "2026-06-12 14:45:22.433213", "msg": "non-zero return code", "rc": 1, "start": "2026-06-12 14:45:22.424637", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+...ignoring
+fatal: [redis-node-4]: FAILED! => {"changed": false, "cmd": ["pgrep", "-u", "redis", "redis-server"], "delta": "0:00:00.006700", "end": "2026-06-12 14:45:22.436832", "msg": "non-zero return code", "rc": 1, "start": "2026-06-12 14:45:22.430132", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+...ignoring
+fatal: [redis-node-6]: FAILED! => {"changed": false, "cmd": ["pgrep", "-u", "redis", "redis-server"], "delta": "0:00:00.004524", "end": "2026-06-12 14:45:22.938377", "msg": "non-zero return code", "rc": 1, "start": "2026-06-12 14:45:22.933853", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+...ignoring
+
+TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
+[WARNING]: Unable to use '/home/redis/.ansible/tmp' as temporary directory, falling back to system default: [Errno 13] Permission denied: '/home/redis'
+
+Unable to use '/home/redis/.ansible/tmp' as temporary directory, falling back to system default.
+
+<<< caused by >>>
+
+[Errno 13] Permission denied: '/home/redis'
+
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: /home/pain/Documents/zohoassignment/submission/ansible/roles/redis/tasks/main.yml:99:7
+
+97   become_user: "{{ redis_user }}"
+98   when:
+99     - ansible_service_mgr != 'systemd'
+         ^ column 7
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [redis-node-1]
+changed: [redis-node-2]
+changed: [redis-node-4]
+changed: [redis-node-3]
+changed: [redis-node-5]
+changed: [redis-node-6]
+
+PLAY RECAP *********************************************************************
+redis-node-1               : ok=12   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=1   
+redis-node-2               : ok=12   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=1   
+redis-node-3               : ok=12   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=1   
+redis-node-4               : ok=12   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=1   
+redis-node-5               : ok=12   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=1   
+redis-node-6               : ok=12   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=1   
+

@@ -1,0 +1,35 @@
+10.10.0.11:6379 (261f6b91...) -> 17 keys | 5461 slots | 1 slaves.
+10.10.0.12:6379 (87dabb70...) -> 17 keys | 5462 slots | 1 slaves.
+10.10.0.13:6379 (c27e51d4...) -> 16 keys | 5461 slots | 1 slaves.
+[OK] 50 keys in 3 masters.
+0.00 keys per slot on average.
+>>> Performing Cluster Check (using node 10.10.0.11:6379)
+M: 261f6b9176052ec418f0a0f0941b2257045afbb2 10.10.0.11:6379
+   slots:[0-5460] (5461 slots) master
+   1 additional replica(s)
+S: 1a79effe8c24544767cb02b8bbffd9fca9eb45f3 10.10.0.15:6379
+   slots: (0 slots) slave
+   replicates 261f6b9176052ec418f0a0f0941b2257045afbb2
+S: 7c2cc8511e155559f8f0d33227e757919459a096 10.10.0.14:6379
+   slots: (0 slots) slave
+   replicates c27e51d4c2109c1029549eb3104d61dfc6b15f96
+S: 7de3ec5d0921bf1bf6a7f6568fea0d37f1de97ea 10.10.0.16:6379
+   slots: (0 slots) slave
+   replicates 87dabb700c033916d889863ee8098f2237e5870f
+M: 87dabb700c033916d889863ee8098f2237e5870f 10.10.0.12:6379
+   slots:[5461-10922] (5462 slots) master
+   1 additional replica(s)
+M: c27e51d4c2109c1029549eb3104d61dfc6b15f96 10.10.0.13:6379
+   slots:[10923-16383] (5461 slots) master
+   1 additional replica(s)
+[OK] All nodes agree about slots configuration.
+>>> Check for open slots...
+>>> Check slots coverage...
+[OK] All 16384 slots covered.
+
+Retrieving sample keys:
+value_1
+value_2
+value_3
+value_4
+value_5

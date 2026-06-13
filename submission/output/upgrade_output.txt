@@ -1,0 +1,285 @@
+
+PLAY [Rolling Upgrade Redis Cluster] *******************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [redis-node-1]
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-1]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-1]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-1] => (item=/etc/redis)
+ok: [redis-node-1] => (item=/var/lib/redis)
+ok: [redis-node-1] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+ok: [redis-node-1]
+
+TASK [redis : Extract Redis source tarball] ************************************
+ok: [redis-node-1]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-1]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-1]
+
+TASK [redis : Template Redis systemd service file] *****************************
+ok: [redis-node-1]
+
+TASK [redis : Force systemd daemon reload] *************************************
+skipping: [redis-node-1]
+
+TASK [redis : Enable and start Redis service under systemd] ********************
+skipping: [redis-node-1]
+
+TASK [redis : Create run directory for manual mode] ****************************
+ok: [redis-node-1]
+
+TASK [redis : Check if Redis is running (manual start check)] ******************
+ok: [redis-node-1]
+
+TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
+skipping: [redis-node-1]
+
+PLAY [Rolling Upgrade Redis Cluster] *******************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [redis-node-2]
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-2]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-2]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-2] => (item=/etc/redis)
+ok: [redis-node-2] => (item=/var/lib/redis)
+ok: [redis-node-2] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+ok: [redis-node-2]
+
+TASK [redis : Extract Redis source tarball] ************************************
+ok: [redis-node-2]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-2]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-2]
+
+TASK [redis : Template Redis systemd service file] *****************************
+ok: [redis-node-2]
+
+TASK [redis : Force systemd daemon reload] *************************************
+skipping: [redis-node-2]
+
+TASK [redis : Enable and start Redis service under systemd] ********************
+skipping: [redis-node-2]
+
+TASK [redis : Create run directory for manual mode] ****************************
+ok: [redis-node-2]
+
+TASK [redis : Check if Redis is running (manual start check)] ******************
+ok: [redis-node-2]
+
+TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
+skipping: [redis-node-2]
+
+PLAY [Rolling Upgrade Redis Cluster] *******************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [redis-node-3]
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-3]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-3]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-3] => (item=/etc/redis)
+ok: [redis-node-3] => (item=/var/lib/redis)
+ok: [redis-node-3] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+ok: [redis-node-3]
+
+TASK [redis : Extract Redis source tarball] ************************************
+ok: [redis-node-3]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-3]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-3]
+
+TASK [redis : Template Redis systemd service file] *****************************
+ok: [redis-node-3]
+
+TASK [redis : Force systemd daemon reload] *************************************
+skipping: [redis-node-3]
+
+TASK [redis : Enable and start Redis service under systemd] ********************
+skipping: [redis-node-3]
+
+TASK [redis : Create run directory for manual mode] ****************************
+ok: [redis-node-3]
+
+TASK [redis : Check if Redis is running (manual start check)] ******************
+ok: [redis-node-3]
+
+TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
+skipping: [redis-node-3]
+
+PLAY [Rolling Upgrade Redis Cluster] *******************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [redis-node-4]
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-4]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-4]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-4] => (item=/etc/redis)
+ok: [redis-node-4] => (item=/var/lib/redis)
+ok: [redis-node-4] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+ok: [redis-node-4]
+
+TASK [redis : Extract Redis source tarball] ************************************
+ok: [redis-node-4]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-4]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-4]
+
+TASK [redis : Template Redis systemd service file] *****************************
+ok: [redis-node-4]
+
+TASK [redis : Force systemd daemon reload] *************************************
+skipping: [redis-node-4]
+
+TASK [redis : Enable and start Redis service under systemd] ********************
+skipping: [redis-node-4]
+
+TASK [redis : Create run directory for manual mode] ****************************
+ok: [redis-node-4]
+
+TASK [redis : Check if Redis is running (manual start check)] ******************
+ok: [redis-node-4]
+
+TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
+skipping: [redis-node-4]
+
+PLAY [Rolling Upgrade Redis Cluster] *******************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [redis-node-5]
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-5]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-5]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-5] => (item=/etc/redis)
+ok: [redis-node-5] => (item=/var/lib/redis)
+ok: [redis-node-5] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+ok: [redis-node-5]
+
+TASK [redis : Extract Redis source tarball] ************************************
+ok: [redis-node-5]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-5]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-5]
+
+TASK [redis : Template Redis systemd service file] *****************************
+ok: [redis-node-5]
+
+TASK [redis : Force systemd daemon reload] *************************************
+skipping: [redis-node-5]
+
+TASK [redis : Enable and start Redis service under systemd] ********************
+skipping: [redis-node-5]
+
+TASK [redis : Create run directory for manual mode] ****************************
+ok: [redis-node-5]
+
+TASK [redis : Check if Redis is running (manual start check)] ******************
+ok: [redis-node-5]
+
+TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
+skipping: [redis-node-5]
+
+PLAY [Rolling Upgrade Redis Cluster] *******************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [redis-node-6]
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-6]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-6]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-6] => (item=/etc/redis)
+ok: [redis-node-6] => (item=/var/lib/redis)
+ok: [redis-node-6] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+ok: [redis-node-6]
+
+TASK [redis : Extract Redis source tarball] ************************************
+ok: [redis-node-6]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-6]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-6]
+
+TASK [redis : Template Redis systemd service file] *****************************
+ok: [redis-node-6]
+
+TASK [redis : Force systemd daemon reload] *************************************
+skipping: [redis-node-6]
+
+TASK [redis : Enable and start Redis service under systemd] ********************
+skipping: [redis-node-6]
+
+TASK [redis : Create run directory for manual mode] ****************************
+ok: [redis-node-6]
+
+TASK [redis : Check if Redis is running (manual start check)] ******************
+ok: [redis-node-6]
+
+TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
+skipping: [redis-node-6]
+
+PLAY RECAP *********************************************************************
+redis-node-1               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+redis-node-2               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+redis-node-3               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+redis-node-4               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+redis-node-5               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+redis-node-6               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+

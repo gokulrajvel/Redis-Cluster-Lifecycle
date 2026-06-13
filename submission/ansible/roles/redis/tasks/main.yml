@@ -1,0 +1,101 @@
+---
+- name: Create redis group
+  group:
+    name: "{{ redis_group }}"
+    state: present
+    system: yes
+
+- name: Create redis user
+  user:
+    name: "{{ redis_user }}"
+    group: "{{ redis_group }}"
+    state: present
+    system: yes
+    create_home: no
+    shell: /usr/sbin/nologin
+
+- name: Create Redis directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ redis_user }}"
+    group: "{{ redis_group }}"
+    mode: '0755'
+  loop:
+    - "{{ redis_conf_dir }}"
+    - "{{ redis_dir }}"
+    - "{{ redis_log_dir }}"
+
+- name: Download Redis source tarball
+  get_url:
+    url: "{{ redis_download_url }}"
+    dest: "/tmp/redis-{{ redis_version }}.tar.gz"
+    mode: '0644'
+
+- name: Extract Redis source tarball
+  unarchive:
+    src: "/tmp/redis-{{ redis_version }}.tar.gz"
+    dest: "/tmp"
+    remote_src: yes
+
+- name: Compile and install Redis from source
+  make:
+    chdir: "/tmp/redis-{{ redis_version }}"
+    target: install
+  become: yes
+
+- name: Template Redis configuration file
+  template:
+    src: redis.conf.j2
+    dest: "{{ redis_conf_dir }}/redis.conf"
+    owner: "{{ redis_user }}"
+    group: "{{ redis_group }}"
+    mode: '0644'
+  notify:
+    - Restart Redis (Systemd)
+    - Restart Redis (Manual)
+
+- name: Template Redis systemd service file
+  template:
+    src: redis.service.j2
+    dest: /etc/systemd/system/redis.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Force systemd daemon reload
+  systemd:
+    daemon_reload: yes
+  when: ansible_service_mgr == 'systemd'
+
+- name: Enable and start Redis service under systemd
+  systemd:
+    name: redis
+    enabled: yes
+    state: started
+  when: ansible_service_mgr == 'systemd'
+
+- name: Create run directory for manual mode
+  file:
+    path: /run/redis
+    state: directory
+    owner: "{{ redis_user }}"
+    group: "{{ redis_group }}"
+    mode: '0755'
+  when: ansible_service_mgr != 'systemd'
+
+- name: Check if Redis is running (manual start check)
+  command: pgrep -u "{{ redis_user }}" redis-server
+  register: redis_running
+  ignore_errors: yes
+  changed_when: false
+  when: ansible_service_mgr != 'systemd'
+
+- name: Start Redis manually if not running (non-systemd environment)
+  shell: redis-server "{{ redis_conf_dir }}/redis.conf"
+  become: yes
+  become_user: "{{ redis_user }}"
+  when:
+    - ansible_service_mgr != 'systemd'
+    - redis_running.rc != 0
+...

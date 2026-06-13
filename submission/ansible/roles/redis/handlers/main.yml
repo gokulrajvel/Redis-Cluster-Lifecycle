@@ -1,0 +1,16 @@
+---
+- name: Restart Redis (Systemd)
+  systemd:
+    name: redis
+    state: restarted
+    daemon_reload: yes
+  when: ansible_service_mgr == 'systemd'
+
+- name: Restart Redis (Manual)
+  shell: |
+    pkill -f "redis-server" || true
+    sleep 1
+    redis-server {{ redis_conf_dir }}/redis.conf
+  become: yes
+  become_user: "{{ redis_user }}"
+  when: ansible_service_mgr != 'systemd'

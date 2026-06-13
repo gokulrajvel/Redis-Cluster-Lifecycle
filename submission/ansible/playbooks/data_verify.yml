@@ -1,0 +1,19 @@
+---
+- name: Verify Seeded Data in Redis Cluster
+  hosts: redis-node-1
+  become: yes
+  tasks:
+    - name: Retrieve sample keys
+      shell: |
+        for i in {1..5}; do
+          echo -n "key_$i: "
+          redis-cli -c GET "key_$i"
+        done
+      args:
+        executable: /bin/bash
+      register: get_output
+
+    - name: Display Retrieved Keys
+      debug:
+        msg: "{{ get_output.stdout_lines }}"
+...
