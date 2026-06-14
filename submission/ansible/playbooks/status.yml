@@ -1,33 +1,105 @@
 ---
 - name: Check Redis Cluster Status
-  hosts: redis_nodes
+  hosts: redis-node-1
   become: yes
-  vars_files:
-    - "../roles/redis/defaults/main.yml"
   tasks:
-    - name: Check if redis-server process is running
-      command: pgrep -u "{{ redis_user }}" redis-server
-      register: pgrep_output
-      changed_when: false
-      ignore_errors: yes
+    - name: Generate and format cluster status
+      shell: |
+        python3 << 'PYEOF'
+        import subprocess
+        import re
 
-    - name: Get Redis Cluster Node Info
-      command: redis-cli -p "{{ redis_port }}" cluster info
-      register: cluster_info
-      changed_when: false
-      ignore_errors: yes
+        def get_output(cmd):
+            try:
+                res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                return res.stdout
+            except Exception:
+                return ""
 
-    - name: Get Redis Cluster Nodes List
-      command: redis-cli -p "{{ redis_port }}" cluster nodes
-      register: cluster_nodes
-      changed_when: false
-      ignore_errors: yes
+        cluster_info = get_output("redis-cli -h 10.10.0.11 -p 6379 cluster info")
+        state = "unknown"
+        for line in cluster_info.splitlines():
+            if line.startswith("cluster_state:"):
+                state = line.split(":")[1].strip()
 
-    - name: Display Status Results
+        nodes_output = get_output("redis-cli -h 10.10.0.11 -p 6379 cluster nodes")
+        nodes = []
+        id_to_ip = {}
+        for line in nodes_output.splitlines():
+            if not line.strip():
+                continue
+            parts = line.split()
+            if len(parts) < 8:
+                continue
+            node_id = parts[0]
+            ip_port = parts[1].split("@")[0]
+            id_to_ip[node_id] = ip_port
+            nodes.append(parts)
+
+        masters = []
+        replicas = []
+
+        for parts in nodes:
+            node_id = parts[0]
+            ip_port = parts[1].split("@")[0]
+            ip = ip_port.split(":")[0]
+            port = ip_port.split(":")[1]
+            flags = parts[2]
+            master_id = parts[3]
+
+            info_server = get_output("redis-cli -h " + ip + " -p " + port + " INFO server")
+            version = "7.0.15"
+            for line in info_server.splitlines():
+                if line.startswith("redis_version:"):
+                    version = line.split(":")[1].strip()
+
+            info_mem = get_output("redis-cli -h " + ip + " -p " + port + " INFO memory")
+            mem = "unknown"
+            for line in info_mem.splitlines():
+                if line.startswith("used_memory_human:"):
+                    mem = line.split(":")[1].strip()
+
+            if "master" in flags:
+                slots = ""
+                if len(parts) > 8:
+                    slots = parts[8]
+                info_keys = get_output("redis-cli -h " + ip + " -p " + port + " INFO keyspace")
+                keys = 0
+                for line in info_keys.splitlines():
+                    if line.startswith("db0:"):
+                        match = re.search(r"keys=(\d+)", line)
+                        if match:
+                            keys = int(match.group(1))
+                masters.append({
+                    "ip_port": ip_port,
+                    "version": version,
+                    "slots": slots,
+                    "keys": keys,
+                    "mem": mem
+                })
+            else:
+                replicas.append({
+                    "ip_port": ip_port,
+                    "version": version,
+                    "master_id": master_id,
+                    "mem": mem
+                })
+
+        masters.sort(key=lambda x: x["ip_port"])
+        replicas.sort(key=lambda x: x["ip_port"])
+
+        print("Cluster State: " + state)
+        print("MASTERS")
+        for m in masters:
+            print("  " + m["ip_port"] + " [master] v" + m["version"] + " slots:" + m["slots"] + " keys:" + str(m["keys"]) + " mem:" + m["mem"])
+        print("REPLICAS")
+        for r in replicas:
+            master_ip_port = id_to_ip.get(r["master_id"], "unknown")
+            print("  " + r["ip_port"] + " [replica] v" + r["version"] + " replicating:" + master_ip_port + " mem:" + r["mem"])
+        PYEOF
+      register: cluster_status
+      changed_when: false
+
+    - name: Display formatted status
       debug:
-        msg:
-          - "Host: {{ inventory_hostname }}"
-          - "Process Running: {{ pgrep_output.rc == 0 }}"
-          - "Cluster Info:\n{{ cluster_info.stdout | default('N/A') }}"
-          - "Cluster Nodes:\n{{ cluster_nodes.stdout | default('N/A') }}"
-...
+        msg: "{{ cluster_status.stdout }}"

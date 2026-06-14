@@ -2,92 +2,17 @@
 PLAY [Check Redis Cluster Status] **********************************************
 
 TASK [Gathering Facts] *********************************************************
-ok: [redis-node-5]
-ok: [redis-node-3]
-ok: [redis-node-2]
-ok: [redis-node-4]
+[WARNING]: Host 'redis-node-1' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
 ok: [redis-node-1]
-ok: [redis-node-6]
 
-TASK [Check if redis-server process is running] ********************************
-ok: [redis-node-3]
-ok: [redis-node-5]
-ok: [redis-node-4]
-ok: [redis-node-2]
+TASK [Generate and format cluster status] **************************************
 ok: [redis-node-1]
-ok: [redis-node-6]
 
-TASK [Get Redis Cluster Node Info] *********************************************
-ok: [redis-node-1]
-ok: [redis-node-2]
-ok: [redis-node-3]
-ok: [redis-node-4]
-ok: [redis-node-5]
-ok: [redis-node-6]
-
-TASK [Get Redis Cluster Nodes List] ********************************************
-ok: [redis-node-1]
-ok: [redis-node-4]
-ok: [redis-node-2]
-ok: [redis-node-3]
-ok: [redis-node-5]
-ok: [redis-node-6]
-
-TASK [Display Status Results] **************************************************
+TASK [Display formatted status] ************************************************
 ok: [redis-node-1] => {
-    "msg": [
-        "Host: redis-node-1",
-        "Process Running: True",
-        "Cluster Info:\ncluster_state:ok\r\ncluster_slots_assigned:16384\r\ncluster_slots_ok:16384\r\ncluster_slots_pfail:0\r\ncluster_slots_fail:0\r\ncluster_known_nodes:6\r\ncluster_size:3\r\ncluster_current_epoch:6\r\ncluster_my_epoch:1\r\ncluster_stats_messages_ping_sent:64\r\ncluster_stats_messages_pong_sent:63\r\ncluster_stats_messages_sent:127\r\ncluster_stats_messages_ping_received:58\r\ncluster_stats_messages_pong_received:64\r\ncluster_stats_messages_meet_received:5\r\ncluster_stats_messages_received:127\r\ntotal_cluster_links_buffer_limit_exceeded:0",
-        "Cluster Nodes:\n1a79effe8c24544767cb02b8bbffd9fca9eb45f3 10.10.0.15:6379@16379 slave 261f6b9176052ec418f0a0f0941b2257045afbb2 0 1781275585518 1 connected\n7c2cc8511e155559f8f0d33227e757919459a096 10.10.0.14:6379@16379 slave c27e51d4c2109c1029549eb3104d61dfc6b15f96 0 1781275585000 3 connected\n7de3ec5d0921bf1bf6a7f6568fea0d37f1de97ea 10.10.0.16:6379@16379 slave 87dabb700c033916d889863ee8098f2237e5870f 0 1781275585114 2 connected\n87dabb700c033916d889863ee8098f2237e5870f 10.10.0.12:6379@16379 master - 0 1781275585619 2 connected 5461-10922\nc27e51d4c2109c1029549eb3104d61dfc6b15f96 10.10.0.13:6379@16379 master - 0 1781275585518 3 connected 10923-16383\n261f6b9176052ec418f0a0f0941b2257045afbb2 10.10.0.11:6379@16379 myself,master - 0 1781275585000 1 connected 0-5460"
-    ]
-}
-ok: [redis-node-2] => {
-    "msg": [
-        "Host: redis-node-2",
-        "Process Running: True",
-        "Cluster Info:\ncluster_state:ok\r\ncluster_slots_assigned:16384\r\ncluster_slots_ok:16384\r\ncluster_slots_pfail:0\r\ncluster_slots_fail:0\r\ncluster_known_nodes:6\r\ncluster_size:3\r\ncluster_current_epoch:6\r\ncluster_my_epoch:2\r\ncluster_stats_messages_ping_sent:66\r\ncluster_stats_messages_pong_sent:70\r\ncluster_stats_messages_meet_sent:1\r\ncluster_stats_messages_sent:137\r\ncluster_stats_messages_ping_received:70\r\ncluster_stats_messages_pong_received:67\r\ncluster_stats_messages_received:137\r\ntotal_cluster_links_buffer_limit_exceeded:0",
-        "Cluster Nodes:\nc27e51d4c2109c1029549eb3104d61dfc6b15f96 10.10.0.13:6379@16379 master - 0 1781275585000 3 connected 10923-16383\n87dabb700c033916d889863ee8098f2237e5870f 10.10.0.12:6379@16379 myself,master - 0 1781275585000 2 connected 5461-10922\n7c2cc8511e155559f8f0d33227e757919459a096 10.10.0.14:6379@16379 slave c27e51d4c2109c1029549eb3104d61dfc6b15f96 0 1781275585093 3 connected\n261f6b9176052ec418f0a0f0941b2257045afbb2 10.10.0.11:6379@16379 master - 0 1781275585598 1 connected 0-5460\n1a79effe8c24544767cb02b8bbffd9fca9eb45f3 10.10.0.15:6379@16379 slave 261f6b9176052ec418f0a0f0941b2257045afbb2 0 1781275585598 1 connected\n7de3ec5d0921bf1bf6a7f6568fea0d37f1de97ea 10.10.0.16:6379@16379 slave 87dabb700c033916d889863ee8098f2237e5870f 0 1781275585000 2 connected"
-    ]
-}
-ok: [redis-node-3] => {
-    "msg": [
-        "Host: redis-node-3",
-        "Process Running: True",
-        "Cluster Info:\ncluster_state:ok\r\ncluster_slots_assigned:16384\r\ncluster_slots_ok:16384\r\ncluster_slots_pfail:0\r\ncluster_slots_fail:0\r\ncluster_known_nodes:6\r\ncluster_size:3\r\ncluster_current_epoch:6\r\ncluster_my_epoch:3\r\ncluster_stats_messages_ping_sent:68\r\ncluster_stats_messages_pong_sent:63\r\ncluster_stats_messages_meet_sent:1\r\ncluster_stats_messages_sent:132\r\ncluster_stats_messages_ping_received:63\r\ncluster_stats_messages_pong_received:69\r\ncluster_stats_messages_received:132\r\ntotal_cluster_links_buffer_limit_exceeded:0",
-        "Cluster Nodes:\n1a79effe8c24544767cb02b8bbffd9fca9eb45f3 10.10.0.15:6379@16379 slave 261f6b9176052ec418f0a0f0941b2257045afbb2 0 1781275585619 1 connected\n87dabb700c033916d889863ee8098f2237e5870f 10.10.0.12:6379@16379 master - 0 1781275583597 2 connected 5461-10922\n261f6b9176052ec418f0a0f0941b2257045afbb2 10.10.0.11:6379@16379 master - 0 1781275585114 1 connected 0-5460\n7c2cc8511e155559f8f0d33227e757919459a096 10.10.0.14:6379@16379 slave c27e51d4c2109c1029549eb3104d61dfc6b15f96 0 1781275585000 3 connected\n7de3ec5d0921bf1bf6a7f6568fea0d37f1de97ea 10.10.0.16:6379@16379 slave 87dabb700c033916d889863ee8098f2237e5870f 0 1781275585000 2 connected\nc27e51d4c2109c1029549eb3104d61dfc6b15f96 10.10.0.13:6379@16379 myself,master - 0 1781275585000 3 connected 10923-16383"
-    ]
-}
-ok: [redis-node-4] => {
-    "msg": [
-        "Host: redis-node-4",
-        "Process Running: True",
-        "Cluster Info:\ncluster_state:ok\r\ncluster_slots_assigned:16384\r\ncluster_slots_ok:16384\r\ncluster_slots_pfail:0\r\ncluster_slots_fail:0\r\ncluster_known_nodes:6\r\ncluster_size:3\r\ncluster_current_epoch:6\r\ncluster_my_epoch:3\r\ncluster_stats_messages_ping_sent:63\r\ncluster_stats_messages_pong_sent:65\r\ncluster_stats_messages_meet_sent:1\r\ncluster_stats_messages_sent:129\r\ncluster_stats_messages_ping_received:65\r\ncluster_stats_messages_pong_received:64\r\ncluster_stats_messages_received:129\r\ntotal_cluster_links_buffer_limit_exceeded:0",
-        "Cluster Nodes:\n87dabb700c033916d889863ee8098f2237e5870f 10.10.0.12:6379@16379 master - 0 1781275585160 2 connected 5461-10922\n1a79effe8c24544767cb02b8bbffd9fca9eb45f3 10.10.0.15:6379@16379 slave 261f6b9176052ec418f0a0f0941b2257045afbb2 0 1781275585564 1 connected\nc27e51d4c2109c1029549eb3104d61dfc6b15f96 10.10.0.13:6379@16379 master - 0 1781275584149 3 connected 10923-16383\n261f6b9176052ec418f0a0f0941b2257045afbb2 10.10.0.11:6379@16379 master - 0 1781275585000 1 connected 0-5460\n7de3ec5d0921bf1bf6a7f6568fea0d37f1de97ea 10.10.0.16:6379@16379 slave 87dabb700c033916d889863ee8098f2237e5870f 0 1781275585000 2 connected\n7c2cc8511e155559f8f0d33227e757919459a096 10.10.0.14:6379@16379 myself,slave c27e51d4c2109c1029549eb3104d61dfc6b15f96 0 1781275585000 3 connected"
-    ]
-}
-ok: [redis-node-5] => {
-    "msg": [
-        "Host: redis-node-5",
-        "Process Running: True",
-        "Cluster Info:\ncluster_state:ok\r\ncluster_slots_assigned:16384\r\ncluster_slots_ok:16384\r\ncluster_slots_pfail:0\r\ncluster_slots_fail:0\r\ncluster_known_nodes:6\r\ncluster_size:3\r\ncluster_current_epoch:6\r\ncluster_my_epoch:1\r\ncluster_stats_messages_ping_sent:61\r\ncluster_stats_messages_pong_sent:68\r\ncluster_stats_messages_meet_sent:1\r\ncluster_stats_messages_sent:130\r\ncluster_stats_messages_ping_received:68\r\ncluster_stats_messages_pong_received:62\r\ncluster_stats_messages_received:130\r\ntotal_cluster_links_buffer_limit_exceeded:0",
-        "Cluster Nodes:\n7c2cc8511e155559f8f0d33227e757919459a096 10.10.0.14:6379@16379 slave c27e51d4c2109c1029549eb3104d61dfc6b15f96 0 1781275585518 3 connected\n7de3ec5d0921bf1bf6a7f6568fea0d37f1de97ea 10.10.0.16:6379@16379 slave 87dabb700c033916d889863ee8098f2237e5870f 0 1781275585000 2 connected\n261f6b9176052ec418f0a0f0941b2257045afbb2 10.10.0.11:6379@16379 master - 0 1781275585000 1 connected 0-5460\n87dabb700c033916d889863ee8098f2237e5870f 10.10.0.12:6379@16379 master - 0 1781275585000 2 connected 5461-10922\nc27e51d4c2109c1029549eb3104d61dfc6b15f96 10.10.0.13:6379@16379 master - 0 1781275585215 3 connected 10923-16383\n1a79effe8c24544767cb02b8bbffd9fca9eb45f3 10.10.0.15:6379@16379 myself,slave 261f6b9176052ec418f0a0f0941b2257045afbb2 0 1781275583000 1 connected"
-    ]
-}
-ok: [redis-node-6] => {
-    "msg": [
-        "Host: redis-node-6",
-        "Process Running: True",
-        "Cluster Info:\ncluster_state:ok\r\ncluster_slots_assigned:16384\r\ncluster_slots_ok:16384\r\ncluster_slots_pfail:0\r\ncluster_slots_fail:0\r\ncluster_known_nodes:6\r\ncluster_size:3\r\ncluster_current_epoch:6\r\ncluster_my_epoch:2\r\ncluster_stats_messages_ping_sent:63\r\ncluster_stats_messages_pong_sent:61\r\ncluster_stats_messages_meet_sent:1\r\ncluster_stats_messages_sent:125\r\ncluster_stats_messages_ping_received:61\r\ncluster_stats_messages_pong_received:64\r\ncluster_stats_messages_received:125\r\ntotal_cluster_links_buffer_limit_exceeded:0",
-        "Cluster Nodes:\nc27e51d4c2109c1029549eb3104d61dfc6b15f96 10.10.0.13:6379@16379 master - 0 1781275585000 3 connected 10923-16383\n87dabb700c033916d889863ee8098f2237e5870f 10.10.0.12:6379@16379 master - 0 1781275585664 2 connected 5461-10922\n7c2cc8511e155559f8f0d33227e757919459a096 10.10.0.14:6379@16379 slave c27e51d4c2109c1029549eb3104d61dfc6b15f96 0 1781275584000 3 connected\n261f6b9176052ec418f0a0f0941b2257045afbb2 10.10.0.11:6379@16379 master - 0 1781275585000 1 connected 0-5460\n7de3ec5d0921bf1bf6a7f6568fea0d37f1de97ea 10.10.0.16:6379@16379 myself,slave 87dabb700c033916d889863ee8098f2237e5870f 0 1781275584000 2 connected\n1a79effe8c24544767cb02b8bbffd9fca9eb45f3 10.10.0.15:6379@16379 slave 261f6b9176052ec418f0a0f0941b2257045afbb2 0 1781275585000 1 connected"
-    ]
+    "msg": "Cluster State: ok\nMASTERS\n  10.10.0.11:6379 [master] v7.0.15 slots:0-5460 keys:0 mem:1.81M\n  10.10.0.12:6379 [master] v7.0.15 slots:5461-10922 keys:0 mem:1.82M\n  10.10.0.13:6379 [master] v7.0.15 slots:10923-16383 keys:0 mem:1.82M\nREPLICAS\n  10.10.0.14:6379 [replica] v7.0.15 replicating:10.10.0.13:6379 mem:1.71M\n  10.10.0.15:6379 [replica] v7.0.15 replicating:10.10.0.11:6379 mem:1.71M\n  10.10.0.16:6379 [replica] v7.0.15 replicating:10.10.0.12:6379 mem:1.71M"
 }
 
 PLAY RECAP *********************************************************************
-redis-node-1               : ok=5    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
-redis-node-2               : ok=5    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
-redis-node-3               : ok=5    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
-redis-node-4               : ok=5    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
-redis-node-5               : ok=5    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
-redis-node-6               : ok=5    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+redis-node-1               : ok=3    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
 

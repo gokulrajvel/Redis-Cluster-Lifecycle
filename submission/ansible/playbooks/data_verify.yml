@@ -3,17 +3,41 @@
   hosts: redis-node-1
   become: yes
   tasks:
-    - name: Retrieve sample keys
+    - name: Retrieve and verify all keys
       shell: |
-        for i in {1..5}; do
-          echo -n "key_$i: "
-          redis-cli -c GET "key_$i"
-        done
-      args:
-        executable: /bin/bash
-      register: get_output
+        python3 -c '
+        import subprocess
+        import hashlib
 
-    - name: Display Retrieved Keys
+        missing_count = 0
+        mismatch_count = 0
+        verified_count = 0
+
+        for i in range(1, 1001):
+            key = f"key:{i:04d}"
+            expected_val = hashlib.sha256(key.encode()).hexdigest()
+            
+            cmd = ["redis-cli", "-c", "-h", "10.10.0.11", "-p", "6379", "GET", key]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            
+            val = res.stdout.strip()
+            
+            if not val or val == "(nil)":
+                missing_count += 1
+            elif val != expected_val:
+                mismatch_count += 1
+            else:
+                verified_count += 1
+
+        if missing_count == 0 and mismatch_count == 0:
+            print(f"PASS — {verified_count}/1000 keys verified")
+        else:
+            print(f"FAIL — {missing_count} missing, {mismatch_count} mismatched")
+        '
+      register: verify_results
+      changed_when: false
+
+    - name: Display Verification Results
       debug:
-        msg: "{{ get_output.stdout_lines }}"
+        msg: "{{ verify_results.stdout }}"
 ...
