@@ -1,50 +1,24 @@
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
-OK
+
+PLAY [Seed Data into Redis Cluster] ********************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'redis-node-1' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-1]
+
+TASK [Seed keys and count placement] *******************************************
+changed: [redis-node-1]
+
+TASK [Display Seeding Results] *************************************************
+ok: [redis-node-1] => 
+    msg: |-
+        Total inserted: 356
+        Failed: 0
+
+        Key Distribution across Masters:
+          10.10.0.14:6379: 115 keys
+          10.10.0.15:6379: 126 keys
+          10.10.0.16:6379: 116 keys
+
+PLAY RECAP *********************************************************************
+redis-node-1               : ok=3    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+

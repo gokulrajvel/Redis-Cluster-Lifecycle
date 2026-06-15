@@ -2,51 +2,51 @@
 PLAY [Provision Redis Cluster Nodes] *******************************************
 
 TASK [Gathering Facts] *********************************************************
-[WARNING]: Host 'redis-node-1' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
-[WARNING]: Host 'redis-node-3' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
 [WARNING]: Host 'redis-node-5' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
 [WARNING]: Host 'redis-node-2' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'redis-node-3' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'redis-node-1' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
 [WARNING]: Host 'redis-node-4' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
 [WARNING]: Host 'redis-node-6' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
-ok: [redis-node-1]
-ok: [redis-node-3]
 ok: [redis-node-5]
 ok: [redis-node-2]
+ok: [redis-node-3]
+ok: [redis-node-1]
 ok: [redis-node-4]
 ok: [redis-node-6]
 
 TASK [redis : Create redis group] **********************************************
+changed: [redis-node-5]
 changed: [redis-node-2]
-changed: [redis-node-3]
 changed: [redis-node-1]
 changed: [redis-node-4]
-changed: [redis-node-5]
+changed: [redis-node-3]
 changed: [redis-node-6]
 
 TASK [redis : Create redis user] ***********************************************
-changed: [redis-node-2]
-changed: [redis-node-5]
-changed: [redis-node-4]
 changed: [redis-node-3]
+changed: [redis-node-2]
+changed: [redis-node-4]
 changed: [redis-node-1]
+changed: [redis-node-5]
 changed: [redis-node-6]
 
 TASK [redis : Create Redis directories] ****************************************
+changed: [redis-node-5] => (item=/etc/redis)
+changed: [redis-node-2] => (item=/etc/redis)
 changed: [redis-node-3] => (item=/etc/redis)
 changed: [redis-node-4] => (item=/etc/redis)
 changed: [redis-node-1] => (item=/etc/redis)
-changed: [redis-node-2] => (item=/etc/redis)
-changed: [redis-node-5] => (item=/etc/redis)
-changed: [redis-node-1] => (item=/var/lib/redis)
-changed: [redis-node-4] => (item=/var/lib/redis)
+changed: [redis-node-5] => (item=/var/lib/redis)
 changed: [redis-node-2] => (item=/var/lib/redis)
 changed: [redis-node-3] => (item=/var/lib/redis)
-changed: [redis-node-5] => (item=/var/lib/redis)
-changed: [redis-node-1] => (item=/var/log/redis)
-changed: [redis-node-2] => (item=/var/log/redis)
-changed: [redis-node-4] => (item=/var/log/redis)
+changed: [redis-node-1] => (item=/var/lib/redis)
+changed: [redis-node-4] => (item=/var/lib/redis)
 changed: [redis-node-5] => (item=/var/log/redis)
+changed: [redis-node-2] => (item=/var/log/redis)
 changed: [redis-node-3] => (item=/var/log/redis)
+changed: [redis-node-4] => (item=/var/log/redis)
+changed: [redis-node-1] => (item=/var/log/redis)
 changed: [redis-node-6] => (item=/etc/redis)
 changed: [redis-node-6] => (item=/var/lib/redis)
 changed: [redis-node-6] => (item=/var/log/redis)
@@ -54,41 +54,41 @@ changed: [redis-node-6] => (item=/var/log/redis)
 TASK [redis : Download Redis source tarball] ***********************************
 changed: [redis-node-1]
 changed: [redis-node-4]
-changed: [redis-node-6]
 changed: [redis-node-2]
 changed: [redis-node-5]
 changed: [redis-node-3]
+changed: [redis-node-6]
 
 TASK [redis : Extract Redis source tarball] ************************************
 changed: [redis-node-5]
-changed: [redis-node-4]
-changed: [redis-node-3]
-changed: [redis-node-2]
 changed: [redis-node-1]
+changed: [redis-node-4]
+changed: [redis-node-2]
+changed: [redis-node-3]
 changed: [redis-node-6]
 
 TASK [redis : Compile and install Redis from source] ***************************
-changed: [redis-node-4]
 changed: [redis-node-3]
 changed: [redis-node-5]
+changed: [redis-node-4]
 changed: [redis-node-1]
 changed: [redis-node-2]
 changed: [redis-node-6]
 
 TASK [redis : Template Redis configuration file] *******************************
-changed: [redis-node-2]
-changed: [redis-node-5]
-changed: [redis-node-4]
 changed: [redis-node-1]
 changed: [redis-node-3]
+changed: [redis-node-5]
+changed: [redis-node-4]
+changed: [redis-node-2]
 changed: [redis-node-6]
 
 TASK [redis : Create run directory] ********************************************
+changed: [redis-node-4]
 changed: [redis-node-1]
+changed: [redis-node-5]
 changed: [redis-node-2]
 changed: [redis-node-3]
-changed: [redis-node-5]
-changed: [redis-node-4]
 changed: [redis-node-6]
 
 TASK [redis : Check if Redis is already running] *******************************
@@ -100,33 +100,117 @@ Origin: /home/pain/Documents/zohoassignment/submission/ansible/roles/redis/tasks
 63 - name: Check if Redis is already running
      ^ column 3
 
-fatal: [redis-node-1]: FAILED! => {"changed": false, "cmd": ["pgrep", "-x", "redis-server"], "delta": "0:00:00.010940", "end": "2026-06-14 09:40:43.247764", "msg": "non-zero return code", "rc": 1, "start": "2026-06-14 09:40:43.236824", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+fatal: [redis-node-5]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.009559'
+    end: '2026-06-15 10:44:36.967270'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 10:44:36.957711'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
 ...ignoring
-fatal: [redis-node-3]: FAILED! => {"changed": false, "cmd": ["pgrep", "-x", "redis-server"], "delta": "0:00:00.013612", "end": "2026-06-14 09:40:43.247672", "msg": "non-zero return code", "rc": 1, "start": "2026-06-14 09:40:43.234060", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+fatal: [redis-node-4]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.005100'
+    end: '2026-06-15 10:44:36.988828'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 10:44:36.983728'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
 ...ignoring
-fatal: [redis-node-2]: FAILED! => {"changed": false, "cmd": ["pgrep", "-x", "redis-server"], "delta": "0:00:00.007426", "end": "2026-06-14 09:40:43.247758", "msg": "non-zero return code", "rc": 1, "start": "2026-06-14 09:40:43.240332", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+fatal: [redis-node-3]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.006189'
+    end: '2026-06-15 10:44:36.992933'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 10:44:36.986744'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
 ...ignoring
-fatal: [redis-node-5]: FAILED! => {"changed": false, "cmd": ["pgrep", "-x", "redis-server"], "delta": "0:00:00.010820", "end": "2026-06-14 09:40:43.247614", "msg": "non-zero return code", "rc": 1, "start": "2026-06-14 09:40:43.236794", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+fatal: [redis-node-1]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.005571'
+    end: '2026-06-15 10:44:37.013647'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 10:44:37.008076'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
 ...ignoring
-fatal: [redis-node-4]: FAILED! => {"changed": false, "cmd": ["pgrep", "-x", "redis-server"], "delta": "0:00:00.014513", "end": "2026-06-14 09:40:43.247562", "msg": "non-zero return code", "rc": 1, "start": "2026-06-14 09:40:43.233049", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+fatal: [redis-node-2]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.005934'
+    end: '2026-06-15 10:44:37.014072'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 10:44:37.008138'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
 ...ignoring
-fatal: [redis-node-6]: FAILED! => {"changed": false, "cmd": ["pgrep", "-x", "redis-server"], "delta": "0:00:00.005196", "end": "2026-06-14 09:40:43.555873", "msg": "non-zero return code", "rc": 1, "start": "2026-06-14 09:40:43.550677", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+fatal: [redis-node-6]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.007026'
+    end: '2026-06-15 10:44:37.333867'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 10:44:37.326841'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
 ...ignoring
 
 TASK [redis : Start Redis manually] ********************************************
-changed: [redis-node-1]
 changed: [redis-node-2]
-changed: [redis-node-4]
+changed: [redis-node-1]
 changed: [redis-node-3]
+changed: [redis-node-4]
 changed: [redis-node-5]
 changed: [redis-node-6]
 
 TASK [redis : Wait for Redis to start] *****************************************
-ok: [redis-node-1]
 ok: [redis-node-5]
-ok: [redis-node-3]
-ok: [redis-node-4]
 ok: [redis-node-2]
+ok: [redis-node-4]
+ok: [redis-node-3]
+ok: [redis-node-1]
 ok: [redis-node-6]
 
 PLAY [Form Redis Cluster] ******************************************************

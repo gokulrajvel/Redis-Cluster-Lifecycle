@@ -9,9 +9,17 @@ TASK [Generate and format cluster status] **************************************
 ok: [redis-node-1]
 
 TASK [Display formatted status] ************************************************
-ok: [redis-node-1] => {
-    "msg": "Cluster State: ok\nMASTERS\n  10.10.0.11:6379 [master] v7.0.15 slots:0-5460 keys:0 mem:1.81M\n  10.10.0.12:6379 [master] v7.0.15 slots:5461-10922 keys:0 mem:1.82M\n  10.10.0.13:6379 [master] v7.0.15 slots:10923-16383 keys:0 mem:1.82M\nREPLICAS\n  10.10.0.14:6379 [replica] v7.0.15 replicating:10.10.0.13:6379 mem:1.71M\n  10.10.0.15:6379 [replica] v7.0.15 replicating:10.10.0.11:6379 mem:1.71M\n  10.10.0.16:6379 [replica] v7.0.15 replicating:10.10.0.12:6379 mem:1.71M"
-}
+ok: [redis-node-1] => 
+    msg: |-
+        Cluster State: ok
+        MASTERS
+         10.10.0.14:6379 [master] v7.2.6 slots: 10923-16383 keys: 115 mem: 1.89M
+         10.10.0.15:6379 [master] v7.2.6 slots: 0-5460 keys: 126 mem: 1.89M
+         10.10.0.16:6379 [master] v7.2.6 slots: 5461-10922 keys: 116 mem: 1.89M
+        REPLICAS
+         10.10.0.11:6379 [replica] v7.2.6 replicating: 10.10.0.15:6379 mem: 1.82M
+         10.10.0.12:6379 [replica] v7.2.6 replicating: 10.10.0.16:6379 mem: 1.77M
+         10.10.0.13:6379 [replica] v7.2.6 replicating: 10.10.0.14:6379 mem: 1.77M
 
 PLAY RECAP *********************************************************************
 redis-node-1               : ok=3    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   

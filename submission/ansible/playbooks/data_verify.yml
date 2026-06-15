@@ -9,18 +9,26 @@
         import subprocess
         import hashlib
 
+        # Fetch num_keys from metadata or ansible vars
+        ansible_num_keys = {{ num_keys | default('None') }}
+        if ansible_num_keys is not None and ansible_num_keys != 'None':
+            num_keys = int(ansible_num_keys)
+        else:
+            res = subprocess.run(["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", "metadata:num_keys"], capture_output=True, text=True)
+            meta_val = res.stdout.strip()
+            num_keys = int(meta_val) if meta_val and meta_val != "(nil)" else 1000
+
         missing_count = 0
         mismatch_count = 0
         verified_count = 0
 
-        for i in range(1, 1001):
+        for i in range(1, num_keys + 1):
             key = f"key:{i:04d}"
             expected_val = hashlib.sha256(key.encode()).hexdigest()
             
-            cmd = ["redis-cli", "-c", "-h", "10.10.0.11", "-p", "6379", "GET", key]
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            
-            val = res.stdout.strip()
+            cmd = ["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", key]
+            res_val = subprocess.run(cmd, capture_output=True, text=True)
+            val = res_val.stdout.strip()
             
             if not val or val == "(nil)":
                 missing_count += 1
@@ -30,7 +38,7 @@
                 verified_count += 1
 
         if missing_count == 0 and mismatch_count == 0:
-            print(f"PASS — {verified_count}/1000 keys verified")
+            print(f"PASS — {verified_count}/{num_keys} keys verified")
         else:
             print(f"FAIL — {missing_count} missing, {mismatch_count} mismatched")
         '

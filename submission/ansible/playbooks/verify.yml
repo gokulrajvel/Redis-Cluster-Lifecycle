@@ -3,21 +3,165 @@
   hosts: redis-node-1
   become: yes
   tasks:
-    - name: Run cluster check
-      command: redis-cli --cluster check 10.10.0.11:6379
+    - name: Run standard cluster check
+      command: redis-cli --cluster check 127.0.0.1:6379
       register: cluster_check
       changed_when: false
+      when: not (full_check | default(false) | bool)
 
     - name: Display Cluster Check Output
       debug:
-        msg: "{{ cluster_check.stdout_lines }}"
+        msg: "{{ cluster_check.stdout }}"
+      when: not (full_check | default(false) | bool)
 
-    - name: Run cluster info
+    - name: Run standard cluster info
       command: redis-cli cluster info
       register: cluster_info
       changed_when: false
+      when: not (full_check | default(false) | bool)
 
     - name: Display Cluster Info
       debug:
-        msg: "{{ cluster_info.stdout_lines }}"
+        msg: "{{ cluster_info.stdout }}"
+      when: not (full_check | default(false) | bool)
+
+    - name: Run comprehensive health check
+      shell: |
+        python3 << 'PYEOF'
+        import subprocess
+        import hashlib
+        import re
+        import sys
+
+        print("=== Phase 5 - Full Verification ===")
+
+        # Fetch num_keys from metadata or ansible vars
+        ansible_num_keys = {{ num_keys | default('None') }}
+        if ansible_num_keys is not None and ansible_num_keys != 'None':
+            num_keys = int(ansible_num_keys)
+        else:
+            res = subprocess.run(["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", "metadata:num_keys"], capture_output=True, text=True)
+            meta_val = res.stdout.strip()
+            num_keys = int(meta_val) if meta_val and meta_val != "(nil)" else 1000
+
+        # Check 1: Data integrity
+        missing_count = 0
+        mismatch_count = 0
+        verified_count = 0
+        for i in range(1, num_keys + 1):
+            key = f"key:{i:04d}"
+            expected_val = hashlib.sha256(key.encode()).hexdigest()
+            cmd = ["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", key]
+            res_val = subprocess.run(cmd, capture_output=True, text=True)
+            val = res_val.stdout.strip()
+            if not val or val == "(nil)":
+                missing_count += 1
+            elif val != expected_val:
+                mismatch_count += 1
+            else:
+                verified_count += 1
+
+        check1_pass = (missing_count == 0 and mismatch_count == 0)
+        check1_status = "PASS" if check1_pass else "FAIL"
+        print(f"Check 1: Data Integrity: {check1_status} ({verified_count}/{num_keys} keys verified)")
+
+        # Check 2: Version consistency
+        nodes_res = subprocess.run(["redis-cli", "-h", "127.0.0.1", "-p", "6379", "cluster", "nodes"], capture_output=True, text=True)
+        nodes = []
+        for line in nodes_res.stdout.splitlines():
+            if line.strip():
+                parts = line.split()
+                if len(parts) >= 2:
+                    ip_port = parts[1].split("@")[0]
+                    nodes.append(ip_port)
+
+        versions = {}
+        for node in nodes:
+            n_ip, n_port = node.split(":")
+            res = subprocess.run(["redis-cli", "-h", n_ip, "-p", n_port, "INFO", "server"], capture_output=True, text=True)
+            version = "unknown"
+            for line in res.stdout.splitlines():
+                if line.startswith("redis_version:"):
+                    version = line.split(":")[1].strip()
+            versions[node] = version
+
+        unique_versions = set(versions.values())
+        check2_pass = (len(unique_versions) == 1)
+        check2_status = "PASS" if check2_pass else "FAIL"
+        print(f"Check 2: Version Consistency: {check2_status} (versions: {versions})")
+
+        # Check 3: Topology health
+        check_res = subprocess.run(["redis-cli", "--cluster", "check", "127.0.0.1:6379"], capture_output=True, text=True)
+        slots_ok = "[OK] All 16384 slots covered" in check_res.stdout
+
+        masters_with_replicas = True
+        master_count = 0
+        replica_count = 0
+        for line in nodes_res.stdout.splitlines():
+            if not line.strip(): continue
+            parts = line.split()
+            if len(parts) < 8: continue
+            flags = parts[2]
+            if "master" in flags:
+                master_count += 1
+                master_id = parts[0]
+                has_replica = False
+                for l2 in nodes_res.stdout.splitlines():
+                    if "slave" in l2 or "replica" in l2:
+                        parts2 = l2.split()
+                        if len(parts2) >= 4 and parts2[3] == master_id:
+                            has_replica = True
+                            break
+                if not has_replica:
+                    masters_with_replicas = False
+            elif "slave" in flags or "replica" in flags:
+                replica_count += 1
+
+        check3_pass = slots_ok and masters_with_replicas and (master_count > 0)
+        check3_status = "PASS" if check3_pass else "FAIL"
+        print(f"Check 3: Topology Health: {check3_status} (slots covered: {slots_ok}, masters with replicas: {masters_with_replicas})")
+
+        # Check 4: Cluster State
+        info_res = subprocess.run(["redis-cli", "-h", "127.0.0.1", "-p", "6379", "cluster", "info"], capture_output=True, text=True)
+        state_ok = "cluster_state:ok" in info_res.stdout
+        check4_status = "PASS" if state_ok else "FAIL"
+        print(f"Check 4: Cluster State: {check4_status}")
+
+        # Check 5: Replication lag
+        replicas_ok = True
+        replica_details = {}
+        for line in nodes_res.stdout.splitlines():
+            if not line.strip(): continue
+            parts = line.split()
+            if len(parts) < 8: continue
+            flags = parts[2]
+            if "slave" in flags or "replica" in flags:
+                ip_port = parts[1].split("@")[0]
+                r_ip, r_port = ip_port.split(":")
+                repl_res = subprocess.run(["redis-cli", "-h", r_ip, "-p", r_port, "INFO", "replication"], capture_output=True, text=True)
+                link_up = "master_link_status:up" in repl_res.stdout
+                replica_details[ip_port] = "up" if link_up else "down"
+                if not link_up:
+                    replicas_ok = False
+
+        check5_pass = replicas_ok and (replica_count > 0)
+        check5_status = "PASS" if check5_pass else "FAIL"
+        print(f"Check 5: Replication Link Status: {check5_status} (replicas: {replica_details})")
+
+        print("\nSUMMARY:")
+        all_passed = check1_pass and check2_pass and check3_pass and state_ok and check5_pass
+        if all_passed:
+            print("ALL CHECKS PASSED - Cluster is healthy and consistent!")
+        else:
+            print("FAIL - One or more health checks failed!")
+            sys.exit(1)
+        PYEOF
+      register: verification_results
+      changed_when: false
+      when: (full_check | default(false) | bool)
+
+    - name: Display Verification Summary
+      debug:
+        msg: "{{ verification_results.stdout }}"
+      when: (full_check | default(false) | bool)
 ...

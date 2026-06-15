@@ -2,6 +2,7 @@ version: '3'
 
 services:
   redis-node-1:
+    image: redis-node-base:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -11,78 +12,68 @@ services:
       redis-net:
         ipv4_address: 10.10.0.11
     ports:
-      - "2201:22"
-      - "6371:6379"
+      - "2301:22"
+      - "6471:6379"
     restart: always
 
   redis-node-2:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: redis-node-base:latest
     container_name: redis-node-2
     hostname: redis-node-2
     networks:
       redis-net:
         ipv4_address: 10.10.0.12
     ports:
-      - "2202:22"
-      - "6372:6379"
+      - "2302:22"
+      - "6472:6379"
     restart: always
 
   redis-node-3:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: redis-node-base:latest
     container_name: redis-node-3
     hostname: redis-node-3
     networks:
       redis-net:
         ipv4_address: 10.10.0.13
     ports:
-      - "2203:22"
-      - "6373:6379"
+      - "2303:22"
+      - "6473:6379"
     restart: always
 
   redis-node-4:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: redis-node-base:latest
     container_name: redis-node-4
     hostname: redis-node-4
     networks:
       redis-net:
         ipv4_address: 10.10.0.14
     ports:
-      - "2204:22"
-      - "6374:6379"
+      - "2304:22"
+      - "6474:6379"
     restart: always
 
   redis-node-5:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: redis-node-base:latest
     container_name: redis-node-5
     hostname: redis-node-5
     networks:
       redis-net:
         ipv4_address: 10.10.0.15
     ports:
-      - "2205:22"
-      - "6375:6379"
+      - "2305:22"
+      - "6475:6379"
     restart: always
 
   redis-node-6:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: redis-node-base:latest
     container_name: redis-node-6
     hostname: redis-node-6
     networks:
       redis-net:
         ipv4_address: 10.10.0.16
     ports:
-      - "2206:22"
-      - "6376:6379"
+      - "2306:22"
+      - "6476:6379"
     restart: always
 
 networks:

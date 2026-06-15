@@ -1,23 +1,403 @@
 ---
-- name: Rolling Upgrade Redis Cluster
-  hosts: redis_nodes
+- name: Pre-Flight Checks
+  hosts: redis-node-1
+  become: yes
+  vars:
+    target_version: "{{ redis_version | default('7.2.6') }}"
+  tasks:
+    - name: Verify cluster health
+      command: redis-cli -h 10.10.0.11 -p 6379 cluster info
+      register: cluster_info_pre
+      changed_when: false
+
+    - name: Assert cluster state is ok
+      fail:
+        msg: "Cluster is not healthy! Current state: {{ cluster_info_pre.stdout }}"
+      when: "'cluster_state:ok' not in cluster_info_pre.stdout"
+
+    - name: Verify all nodes are reachable
+      command: "redis-cli -h {{ item }} -p 6379 ping"
+      loop:
+        - "10.10.0.11"
+        - "10.10.0.12"
+        - "10.10.0.13"
+        - "10.10.0.14"
+        - "10.10.0.15"
+        - "10.10.0.16"
+      register: ping_result
+      changed_when: false
+      failed_when: "'PONG' not in ping_result.stdout"
+
+    - name: Verify target version differs from current version
+      shell: |
+        python3 -c '
+        import subprocess
+        res = subprocess.run(["redis-cli", "-h", "127.0.0.1", "-p", "6379", "INFO", "server"], capture_output=True, text=True)
+        current_version = ""
+        for line in res.stdout.splitlines():
+            if line.startswith("redis_version:"):
+                current_version = line.split(":")[1].strip()
+        print(f"Current version: {current_version}, Target version: {{ target_version }}")
+        if current_version == "{{ target_version }}":
+            print("MATCH")
+        '
+      register: version_check
+      changed_when: false
+      failed_when: "'MATCH' in version_check.stdout"
+
+    - name: Run data verify for pre-upgrade integrity baseline
+      shell: |
+        python3 -c '
+        import subprocess
+        import hashlib
+
+        # Fetch num_keys from metadata or ansible vars
+        ansible_num_keys = {{ num_keys | default('None') }}
+        if ansible_num_keys is not None and ansible_num_keys != 'None':
+            num_keys = int(ansible_num_keys)
+        else:
+            res = subprocess.run(["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", "metadata:num_keys"], capture_output=True, text=True)
+            meta_val = res.stdout.strip()
+            num_keys = int(meta_val) if meta_val and meta_val != "(nil)" else 1000
+
+        missing_count = 0
+        mismatch_count = 0
+        verified_count = 0
+
+        for i in range(1, num_keys + 1):
+            key = f"key:{i:04d}"
+            expected_val = hashlib.sha256(key.encode()).hexdigest()
+            
+            cmd = ["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", key]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            
+            val = res.stdout.strip()
+            
+            if not val or val == "(nil)":
+                missing_count += 1
+            elif val != expected_val:
+                mismatch_count += 1
+            else:
+                verified_count += 1
+
+        if missing_count == 0 and mismatch_count == 0:
+            print(f"PASS — {verified_count}/{num_keys} keys verified")
+        else:
+            print(f"FAIL — {missing_count} missing, {mismatch_count} mismatched")
+        '
+      register: pre_verify_results
+      changed_when: false
+      failed_when: "'FAIL' in pre_verify_results.stdout"
+
+    - name: Display pre-upgrade verification baseline
+      debug:
+        msg: "Pre-upgrade integrity baseline: {{ pre_verify_results.stdout }}"
+
+- name: Rolling Upgrade Redis Replica Nodes
+  hosts: redis-node-5,redis-node-6,redis-node-4
   serial: 1
   become: yes
-  roles:
-    - redis
+  vars:
+    target_version: "{{ redis_version | default('7.2.6') }}"
+    node_ips:
+      redis-node-1: "10.10.0.11"
+      redis-node-2: "10.10.0.12"
+      redis-node-3: "10.10.0.13"
+      redis-node-4: "10.10.0.14"
+      redis-node-5: "10.10.0.15"
+      redis-node-6: "10.10.0.16"
   tasks:
-    - name: Restart Redis to apply upgrade (Manual)
-      shell: |
-        pkill -f "redis-server" || true
-        sleep 2
-        redis-server "{{ redis_conf_dir }}/redis.conf"
-      become: yes
-      become_user: "{{ redis_user }}"
-      when: ansible_service_mgr != 'systemd'
+    - name: Stop Redis on replica
+      shell: pkill redis-server || true
+      changed_when: true
 
-    - name: Restart Redis to apply upgrade (Systemd)
-      systemd:
+    - name: Clean up nodes.conf compatibility issues for rolling upgrade
+      shell: |
+        python3 -c '
+        import os
+        config_path = "/var/lib/redis/nodes.conf"
+        if os.path.exists(config_path):
+            with open(config_path, "r") as f:
+                lines = f.readlines()
+            new_lines = []
+            for line in lines:
+                parts = line.split()
+                if len(parts) > 1 and "," in parts[1]:
+                    parts[1] = parts[1].split(",")[0]
+                    line = " ".join(parts) + "\n"
+                new_lines.append(line)
+            with open(config_path, "w") as f:
+                f.writelines(new_lines)
+        '
+      changed_when: true
+
+    - name: Include redis role to compile and configure target version
+      include_role:
         name: redis
-        state: restarted
-      when: ansible_service_mgr == 'systemd'
+      vars:
+        redis_version: "{{ target_version }}"
+
+    - name: Wait for replica to rejoin cluster and sync
+      command: redis-cli -p 6379 info replication
+      register: replication_info
+      until: "'master_link_status:up' in replication_info.stdout or 'role:master' in replication_info.stdout"
+      retries: 30
+      delay: 2
+      changed_when: false
+
+    - name: Check that cluster state is ok
+      command: redis-cli -h 10.10.0.11 cluster info
+      register: cluster_info_cmd
+      failed_when: "'cluster_state:ok' not in cluster_info_cmd.stdout"
+      changed_when: false
+
+    - name: Print upgrade progress and status
+      debug:
+        msg: "[{{ ansible_play_hosts_all.index(inventory_hostname) + 1 }}/6] Upgraded replica {{ node_ips[inventory_hostname] }} — cluster: ok"
+
+- name: Rolling Upgrade Redis Master Nodes
+  hosts: redis-node-1,redis-node-2,redis-node-3
+  serial: 1
+  become: yes
+  vars:
+    target_version: "{{ redis_version | default('7.2.6') }}"
+    node_ips:
+      redis-node-1: "10.10.0.11"
+      redis-node-2: "10.10.0.12"
+      redis-node-3: "10.10.0.13"
+      redis-node-4: "10.10.0.14"
+      redis-node-5: "10.10.0.15"
+      redis-node-6: "10.10.0.16"
+    replica_hosts:
+      redis-node-1: "redis-node-5"
+      redis-node-2: "redis-node-6"
+      redis-node-3: "redis-node-4"
+  tasks:
+    - name: Run CLUSTER FAILOVER on the replica
+      command: redis-cli -p 6379 CLUSTER FAILOVER
+      delegate_to: "{{ replica_hosts[inventory_hostname] }}"
+
+    - name: Wait for old master to become a replica
+      command: redis-cli -p 6379 info replication
+      register: old_master_info
+      until: "'role:slave' in old_master_info.stdout"
+      retries: 30
+      delay: 2
+      changed_when: false
+
+    - name: Stop Redis on old master
+      shell: pkill redis-server || true
+      changed_when: true
+
+    - name: Clean up nodes.conf compatibility issues for rolling upgrade
+      shell: |
+        python3 -c '
+        import os
+        config_path = "/var/lib/redis/nodes.conf"
+        if os.path.exists(config_path):
+            with open(config_path, "r") as f:
+                lines = f.readlines()
+            new_lines = []
+            for line in lines:
+                parts = line.split()
+                if len(parts) > 1 and "," in parts[1]:
+                    parts[1] = parts[1].split(",")[0]
+                    line = " ".join(parts) + "\n"
+                new_lines.append(line)
+            with open(config_path, "w") as f:
+                f.writelines(new_lines)
+        '
+      changed_when: true
+
+    - name: Include redis role to compile and configure target version
+      include_role:
+        name: redis
+      vars:
+        redis_version: "{{ target_version }}"
+
+    - name: Wait for old master (now replica) to rejoin and sync
+      command: redis-cli -p 6379 info replication
+      register: replication_info
+      until: "'master_link_status:up' in replication_info.stdout or 'role:master' in replication_info.stdout"
+      retries: 30
+      delay: 2
+      changed_when: false
+
+    - name: Check that cluster state is ok
+      command: redis-cli -h 10.10.0.11 cluster info
+      register: cluster_info_cmd
+      failed_when: "'cluster_state:ok' not in cluster_info_cmd.stdout"
+      changed_when: false
+
+    - name: Print upgrade progress and status
+      debug:
+        msg: "[{{ ansible_play_hosts_all.index(inventory_hostname) + 4 }}/6] Upgraded master {{ node_ips[inventory_hostname] }} — cluster: ok"
+
+- name: Verify Upgrade and Data Integrity
+  hosts: redis-node-1
+  become: yes
+  vars:
+    target_version: "{{ redis_version | default('7.2.6') }}"
+  tasks:
+    - name: Run data verification
+      shell: |
+        python3 -c '
+        import subprocess
+        import hashlib
+
+        # Fetch num_keys from metadata or ansible vars
+        ansible_num_keys = {{ num_keys | default('None') }}
+        if ansible_num_keys is not None and ansible_num_keys != 'None':
+            num_keys = int(ansible_num_keys)
+        else:
+            res = subprocess.run(["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", "metadata:num_keys"], capture_output=True, text=True)
+            meta_val = res.stdout.strip()
+            num_keys = int(meta_val) if meta_val and meta_val != "(nil)" else 1000
+
+        missing_count = 0
+        mismatch_count = 0
+        verified_count = 0
+
+        for i in range(1, num_keys + 1):
+            key = f"key:{i:04d}"
+            expected_val = hashlib.sha256(key.encode()).hexdigest()
+            
+            cmd = ["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", key]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            
+            val = res.stdout.strip()
+            
+            if not val or val == "(nil)":
+                missing_count += 1
+            elif val != expected_val:
+                mismatch_count += 1
+            else:
+                verified_count += 1
+
+        if missing_count == 0 and mismatch_count == 0:
+            print(f"PASS — {verified_count}/{num_keys} keys verified")
+        else:
+            print(f"FAIL — {missing_count} missing, {mismatch_count} mismatched")
+        '
+      register: data_verification_results
+      changed_when: false
+      failed_when: "'FAIL' in data_verification_results.stdout"
+
+    - name: Display data verification output
+      debug:
+        msg: "{{ data_verification_results.stdout }}"
+
+    - name: Run cluster status check
+      shell: |
+        python3 << 'PYEOF'
+        import subprocess
+        import re
+
+        def get_output(cmd):
+            try:
+                res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                return res.stdout
+            except Exception:
+                return ""
+
+        cluster_info = get_output("redis-cli -h 127.0.0.1 -p 6379 cluster info")
+        state = "unknown"
+        for line in cluster_info.splitlines():
+            if line.startswith("cluster_state:"):
+                state = line.split(":")[1].strip()
+
+        nodes_output = get_output("redis-cli -h 127.0.0.1 -p 6379 cluster nodes")
+        nodes = []
+        id_to_ip = {}
+        for line in nodes_output.splitlines():
+            if not line.strip():
+                continue
+            parts = line.split()
+            if len(parts) < 8:
+                continue
+            node_id = parts[0]
+            ip_port = parts[1].split("@")[0]
+            id_to_ip[node_id] = ip_port
+            nodes.append(parts)
+
+        masters = []
+        replicas = []
+        all_target_version = True
+
+        for parts in nodes:
+            node_id = parts[0]
+            ip_port = parts[1].split("@")[0]
+            ip = ip_port.split(":")[0]
+            port = ip_port.split(":")[1]
+            flags = parts[2]
+            master_id = parts[3]
+
+            info_server = get_output("redis-cli -h " + ip + " -p " + port + " INFO server")
+            version = "unknown"
+            for line in info_server.splitlines():
+                if line.startswith("redis_version:"):
+                    version = line.split(":")[1].strip()
+            if version != "{{ target_version }}":
+                all_target_version = False
+
+            info_mem = get_output("redis-cli -h " + ip + " -p " + port + " INFO memory")
+            mem = "unknown"
+            for line in info_mem.splitlines():
+                if line.startswith("used_memory_human:"):
+                    mem = line.split(":")[1].strip()
+
+            if "master" in flags:
+                slots = ""
+                if len(parts) > 8:
+                    slots = parts[8]
+                info_keys = get_output("redis-cli -h " + ip + " -p " + port + " INFO keyspace")
+                keys = 0
+                for line in info_keys.splitlines():
+                    if line.startswith("db0:"):
+                        match = re.search(r"keys=(\d+)", line)
+                        if match:
+                            keys = int(match.group(1))
+                masters.append({
+                    "ip_port": ip_port,
+                    "version": version,
+                    "slots": slots,
+                    "keys": keys,
+                    "mem": mem
+                })
+            else:
+                replicas.append({
+                    "ip_port": ip_port,
+                    "version": version,
+                    "master_id": master_id,
+                    "mem": mem
+                })
+
+        masters.sort(key=lambda x: x["ip_port"])
+        replicas.sort(key=lambda x: x["ip_port"])
+
+        print("Cluster State: " + state)
+        print("MASTERS")
+        for m in masters:
+            print(" " + m["ip_port"] + " [master] v" + m["version"] + " slots: " + m["slots"] + " keys: " + str(m["keys"]) + " mem: " + m["mem"])
+        print("REPLICAS")
+        for r in replicas:
+            master_ip_port = id_to_ip.get(r["master_id"], "unknown")
+            print(" " + r["ip_port"] + " [replica] v" + r["version"] + " replicating: " + master_ip_port + " mem: " + r["mem"])
+        
+        if all_target_version and state == "ok":
+            print("STATUS: ALL_OK")
+        else:
+            print("STATUS: FAIL")
+        PYEOF
+      register: status_results
+      changed_when: false
+      failed_when: "'STATUS: ALL_OK' not in status_results.stdout"
+
+    - name: Display cluster status
+      debug:
+        msg: "{{ status_results.stdout }}"
+
+    - name: Print upgrade complete confirmation
+      debug:
+        msg: "UPGRADE COMPLETE — all nodes on v{{ target_version }}, data integrity verified"
 ...

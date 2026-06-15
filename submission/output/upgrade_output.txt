@@ -1,192 +1,48 @@
 
-PLAY [Rolling Upgrade Redis Cluster] *******************************************
+PLAY [Pre-Flight Checks] *******************************************************
 
 TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'redis-node-1' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
 ok: [redis-node-1]
 
-TASK [redis : Create redis group] **********************************************
+TASK [Verify cluster health] ***************************************************
 ok: [redis-node-1]
 
-TASK [redis : Create redis user] ***********************************************
-ok: [redis-node-1]
-
-TASK [redis : Create Redis directories] ****************************************
-ok: [redis-node-1] => (item=/etc/redis)
-ok: [redis-node-1] => (item=/var/lib/redis)
-ok: [redis-node-1] => (item=/var/log/redis)
-
-TASK [redis : Download Redis source tarball] ***********************************
-ok: [redis-node-1]
-
-TASK [redis : Extract Redis source tarball] ************************************
-ok: [redis-node-1]
-
-TASK [redis : Compile and install Redis from source] ***************************
-changed: [redis-node-1]
-
-TASK [redis : Template Redis configuration file] *******************************
-ok: [redis-node-1]
-
-TASK [redis : Template Redis systemd service file] *****************************
-ok: [redis-node-1]
-
-TASK [redis : Force systemd daemon reload] *************************************
+TASK [Assert cluster state is ok] **********************************************
 skipping: [redis-node-1]
 
-TASK [redis : Enable and start Redis service under systemd] ********************
-skipping: [redis-node-1]
+TASK [Verify all nodes are reachable] ******************************************
+ok: [redis-node-1] => (item=10.10.0.11)
+ok: [redis-node-1] => (item=10.10.0.12)
+ok: [redis-node-1] => (item=10.10.0.13)
+ok: [redis-node-1] => (item=10.10.0.14)
+ok: [redis-node-1] => (item=10.10.0.15)
+ok: [redis-node-1] => (item=10.10.0.16)
 
-TASK [redis : Create run directory for manual mode] ****************************
+TASK [Verify target version differs from current version] **********************
 ok: [redis-node-1]
 
-TASK [redis : Check if Redis is running (manual start check)] ******************
+TASK [Run data verify for pre-upgrade integrity baseline] **********************
 ok: [redis-node-1]
 
-TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
-skipping: [redis-node-1]
+TASK [Display pre-upgrade verification baseline] *******************************
+ok: [redis-node-1] => 
+    msg: 'Pre-upgrade integrity baseline: PASS — 505/505 keys verified'
 
-PLAY [Rolling Upgrade Redis Cluster] *******************************************
-
-TASK [Gathering Facts] *********************************************************
-ok: [redis-node-2]
-
-TASK [redis : Create redis group] **********************************************
-ok: [redis-node-2]
-
-TASK [redis : Create redis user] ***********************************************
-ok: [redis-node-2]
-
-TASK [redis : Create Redis directories] ****************************************
-ok: [redis-node-2] => (item=/etc/redis)
-ok: [redis-node-2] => (item=/var/lib/redis)
-ok: [redis-node-2] => (item=/var/log/redis)
-
-TASK [redis : Download Redis source tarball] ***********************************
-ok: [redis-node-2]
-
-TASK [redis : Extract Redis source tarball] ************************************
-ok: [redis-node-2]
-
-TASK [redis : Compile and install Redis from source] ***************************
-changed: [redis-node-2]
-
-TASK [redis : Template Redis configuration file] *******************************
-ok: [redis-node-2]
-
-TASK [redis : Template Redis systemd service file] *****************************
-ok: [redis-node-2]
-
-TASK [redis : Force systemd daemon reload] *************************************
-skipping: [redis-node-2]
-
-TASK [redis : Enable and start Redis service under systemd] ********************
-skipping: [redis-node-2]
-
-TASK [redis : Create run directory for manual mode] ****************************
-ok: [redis-node-2]
-
-TASK [redis : Check if Redis is running (manual start check)] ******************
-ok: [redis-node-2]
-
-TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
-skipping: [redis-node-2]
-
-PLAY [Rolling Upgrade Redis Cluster] *******************************************
+PLAY [Rolling Upgrade Redis Replica Nodes] *************************************
 
 TASK [Gathering Facts] *********************************************************
-ok: [redis-node-3]
-
-TASK [redis : Create redis group] **********************************************
-ok: [redis-node-3]
-
-TASK [redis : Create redis user] ***********************************************
-ok: [redis-node-3]
-
-TASK [redis : Create Redis directories] ****************************************
-ok: [redis-node-3] => (item=/etc/redis)
-ok: [redis-node-3] => (item=/var/lib/redis)
-ok: [redis-node-3] => (item=/var/log/redis)
-
-TASK [redis : Download Redis source tarball] ***********************************
-ok: [redis-node-3]
-
-TASK [redis : Extract Redis source tarball] ************************************
-ok: [redis-node-3]
-
-TASK [redis : Compile and install Redis from source] ***************************
-changed: [redis-node-3]
-
-TASK [redis : Template Redis configuration file] *******************************
-ok: [redis-node-3]
-
-TASK [redis : Template Redis systemd service file] *****************************
-ok: [redis-node-3]
-
-TASK [redis : Force systemd daemon reload] *************************************
-skipping: [redis-node-3]
-
-TASK [redis : Enable and start Redis service under systemd] ********************
-skipping: [redis-node-3]
-
-TASK [redis : Create run directory for manual mode] ****************************
-ok: [redis-node-3]
-
-TASK [redis : Check if Redis is running (manual start check)] ******************
-ok: [redis-node-3]
-
-TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
-skipping: [redis-node-3]
-
-PLAY [Rolling Upgrade Redis Cluster] *******************************************
-
-TASK [Gathering Facts] *********************************************************
-ok: [redis-node-4]
-
-TASK [redis : Create redis group] **********************************************
-ok: [redis-node-4]
-
-TASK [redis : Create redis user] ***********************************************
-ok: [redis-node-4]
-
-TASK [redis : Create Redis directories] ****************************************
-ok: [redis-node-4] => (item=/etc/redis)
-ok: [redis-node-4] => (item=/var/lib/redis)
-ok: [redis-node-4] => (item=/var/log/redis)
-
-TASK [redis : Download Redis source tarball] ***********************************
-ok: [redis-node-4]
-
-TASK [redis : Extract Redis source tarball] ************************************
-ok: [redis-node-4]
-
-TASK [redis : Compile and install Redis from source] ***************************
-changed: [redis-node-4]
-
-TASK [redis : Template Redis configuration file] *******************************
-ok: [redis-node-4]
-
-TASK [redis : Template Redis systemd service file] *****************************
-ok: [redis-node-4]
-
-TASK [redis : Force systemd daemon reload] *************************************
-skipping: [redis-node-4]
-
-TASK [redis : Enable and start Redis service under systemd] ********************
-skipping: [redis-node-4]
-
-TASK [redis : Create run directory for manual mode] ****************************
-ok: [redis-node-4]
-
-TASK [redis : Check if Redis is running (manual start check)] ******************
-ok: [redis-node-4]
-
-TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
-skipping: [redis-node-4]
-
-PLAY [Rolling Upgrade Redis Cluster] *******************************************
-
-TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'redis-node-5' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
 ok: [redis-node-5]
+
+TASK [Stop Redis on replica] ***************************************************
+changed: [redis-node-5]
+
+TASK [Clean up nodes.conf compatibility issues for rolling upgrade] ************
+changed: [redis-node-5]
+
+TASK [Include redis role to compile and configure target version] **************
+included: redis for redis-node-5
 
 TASK [redis : Create redis group] **********************************************
 ok: [redis-node-5]
@@ -200,10 +56,10 @@ ok: [redis-node-5] => (item=/var/lib/redis)
 ok: [redis-node-5] => (item=/var/log/redis)
 
 TASK [redis : Download Redis source tarball] ***********************************
-ok: [redis-node-5]
+changed: [redis-node-5]
 
 TASK [redis : Extract Redis source tarball] ************************************
-ok: [redis-node-5]
+changed: [redis-node-5]
 
 TASK [redis : Compile and install Redis from source] ***************************
 changed: [redis-node-5]
@@ -211,28 +67,67 @@ changed: [redis-node-5]
 TASK [redis : Template Redis configuration file] *******************************
 ok: [redis-node-5]
 
-TASK [redis : Template Redis systemd service file] *****************************
+TASK [redis : Create run directory] ********************************************
 ok: [redis-node-5]
 
-TASK [redis : Force systemd daemon reload] *************************************
-skipping: [redis-node-5]
+TASK [redis : Check if Redis is already running] *******************************
+[ERROR]: Task failed: Module failed: non-zero return code
+Origin: /home/pain/Documents/zohoassignment/submission/ansible/roles/redis/tasks/main.yml:63:3
 
-TASK [redis : Enable and start Redis service under systemd] ********************
-skipping: [redis-node-5]
+61     mode: '0755'
+62
+63 - name: Check if Redis is already running
+     ^ column 3
 
-TASK [redis : Create run directory for manual mode] ****************************
+fatal: [redis-node-5]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.027604'
+    end: '2026-06-15 11:07:52.937666'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 11:07:52.910062'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+...ignoring
+
+TASK [redis : Start Redis manually] ********************************************
+changed: [redis-node-5]
+
+TASK [redis : Wait for Redis to start] *****************************************
 ok: [redis-node-5]
 
-TASK [redis : Check if Redis is running (manual start check)] ******************
+TASK [Wait for replica to rejoin cluster and sync] *****************************
+FAILED - RETRYING: [redis-node-5]: Wait for replica to rejoin cluster and sync (30 retries left).
+FAILED - RETRYING: [redis-node-5]: Wait for replica to rejoin cluster and sync (29 retries left).
 ok: [redis-node-5]
 
-TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
-skipping: [redis-node-5]
+TASK [Check that cluster state is ok] ******************************************
+ok: [redis-node-5]
 
-PLAY [Rolling Upgrade Redis Cluster] *******************************************
+TASK [Print upgrade progress and status] ***************************************
+ok: [redis-node-5] => 
+    msg: '[1/6] Upgraded replica 10.10.0.15 — cluster: ok'
+
+PLAY [Rolling Upgrade Redis Replica Nodes] *************************************
 
 TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'redis-node-6' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
 ok: [redis-node-6]
+
+TASK [Stop Redis on replica] ***************************************************
+changed: [redis-node-6]
+
+TASK [Clean up nodes.conf compatibility issues for rolling upgrade] ************
+changed: [redis-node-6]
+
+TASK [Include redis role to compile and configure target version] **************
+included: redis for redis-node-6
 
 TASK [redis : Create redis group] **********************************************
 ok: [redis-node-6]
@@ -246,10 +141,10 @@ ok: [redis-node-6] => (item=/var/lib/redis)
 ok: [redis-node-6] => (item=/var/log/redis)
 
 TASK [redis : Download Redis source tarball] ***********************************
-ok: [redis-node-6]
+changed: [redis-node-6]
 
 TASK [redis : Extract Redis source tarball] ************************************
-ok: [redis-node-6]
+changed: [redis-node-6]
 
 TASK [redis : Compile and install Redis from source] ***************************
 changed: [redis-node-6]
@@ -257,29 +152,405 @@ changed: [redis-node-6]
 TASK [redis : Template Redis configuration file] *******************************
 ok: [redis-node-6]
 
-TASK [redis : Template Redis systemd service file] *****************************
+TASK [redis : Create run directory] ********************************************
 ok: [redis-node-6]
 
-TASK [redis : Force systemd daemon reload] *************************************
-skipping: [redis-node-6]
+TASK [redis : Check if Redis is already running] *******************************
+fatal: [redis-node-6]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.007283'
+    end: '2026-06-15 11:10:35.408035'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 11:10:35.400752'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+...ignoring
 
-TASK [redis : Enable and start Redis service under systemd] ********************
-skipping: [redis-node-6]
+TASK [redis : Start Redis manually] ********************************************
+changed: [redis-node-6]
 
-TASK [redis : Create run directory for manual mode] ****************************
+TASK [redis : Wait for Redis to start] *****************************************
 ok: [redis-node-6]
 
-TASK [redis : Check if Redis is running (manual start check)] ******************
+TASK [Wait for replica to rejoin cluster and sync] *****************************
+FAILED - RETRYING: [redis-node-6]: Wait for replica to rejoin cluster and sync (30 retries left).
 ok: [redis-node-6]
 
-TASK [redis : Start Redis manually if not running (non-systemd environment)] ***
-skipping: [redis-node-6]
+TASK [Check that cluster state is ok] ******************************************
+ok: [redis-node-6]
+
+TASK [Print upgrade progress and status] ***************************************
+ok: [redis-node-6] => 
+    msg: '[2/6] Upgraded replica 10.10.0.16 — cluster: ok'
+
+PLAY [Rolling Upgrade Redis Replica Nodes] *************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'redis-node-4' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-4]
+
+TASK [Stop Redis on replica] ***************************************************
+changed: [redis-node-4]
+
+TASK [Clean up nodes.conf compatibility issues for rolling upgrade] ************
+changed: [redis-node-4]
+
+TASK [Include redis role to compile and configure target version] **************
+included: redis for redis-node-4
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-4]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-4]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-4] => (item=/etc/redis)
+ok: [redis-node-4] => (item=/var/lib/redis)
+ok: [redis-node-4] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+changed: [redis-node-4]
+
+TASK [redis : Extract Redis source tarball] ************************************
+changed: [redis-node-4]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-4]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-4]
+
+TASK [redis : Create run directory] ********************************************
+ok: [redis-node-4]
+
+TASK [redis : Check if Redis is already running] *******************************
+fatal: [redis-node-4]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.006873'
+    end: '2026-06-15 11:13:11.634531'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 11:13:11.627658'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+...ignoring
+
+TASK [redis : Start Redis manually] ********************************************
+changed: [redis-node-4]
+
+TASK [redis : Wait for Redis to start] *****************************************
+ok: [redis-node-4]
+
+TASK [Wait for replica to rejoin cluster and sync] *****************************
+FAILED - RETRYING: [redis-node-4]: Wait for replica to rejoin cluster and sync (30 retries left).
+ok: [redis-node-4]
+
+TASK [Check that cluster state is ok] ******************************************
+ok: [redis-node-4]
+
+TASK [Print upgrade progress and status] ***************************************
+ok: [redis-node-4] => 
+    msg: '[3/6] Upgraded replica 10.10.0.14 — cluster: ok'
+
+PLAY [Rolling Upgrade Redis Master Nodes] **************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [redis-node-1]
+
+TASK [Run CLUSTER FAILOVER on the replica] *************************************
+changed: [redis-node-1 -> redis-node-5(127.0.0.1)]
+
+TASK [Wait for old master to become a replica] *********************************
+ok: [redis-node-1]
+
+TASK [Stop Redis on old master] ************************************************
+changed: [redis-node-1]
+
+TASK [Clean up nodes.conf compatibility issues for rolling upgrade] ************
+changed: [redis-node-1]
+
+TASK [Include redis role to compile and configure target version] **************
+included: redis for redis-node-1
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-1]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-1]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-1] => (item=/etc/redis)
+ok: [redis-node-1] => (item=/var/lib/redis)
+ok: [redis-node-1] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+changed: [redis-node-1]
+
+TASK [redis : Extract Redis source tarball] ************************************
+changed: [redis-node-1]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-1]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-1]
+
+TASK [redis : Create run directory] ********************************************
+ok: [redis-node-1]
+
+TASK [redis : Check if Redis is already running] *******************************
+fatal: [redis-node-1]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.013106'
+    end: '2026-06-15 11:15:47.686087'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 11:15:47.672981'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+...ignoring
+
+TASK [redis : Start Redis manually] ********************************************
+changed: [redis-node-1]
+
+TASK [redis : Wait for Redis to start] *****************************************
+ok: [redis-node-1]
+
+TASK [Wait for old master (now replica) to rejoin and sync] ********************
+FAILED - RETRYING: [redis-node-1]: Wait for old master (now replica) to rejoin and sync (30 retries left).
+FAILED - RETRYING: [redis-node-1]: Wait for old master (now replica) to rejoin and sync (29 retries left).
+ok: [redis-node-1]
+
+TASK [Check that cluster state is ok] ******************************************
+ok: [redis-node-1]
+
+TASK [Print upgrade progress and status] ***************************************
+ok: [redis-node-1] => 
+    msg: '[4/6] Upgraded master 10.10.0.11 — cluster: ok'
+
+PLAY [Rolling Upgrade Redis Master Nodes] **************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'redis-node-2' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-2]
+
+TASK [Run CLUSTER FAILOVER on the replica] *************************************
+changed: [redis-node-2 -> redis-node-6(127.0.0.1)]
+
+TASK [Wait for old master to become a replica] *********************************
+ok: [redis-node-2]
+
+TASK [Stop Redis on old master] ************************************************
+changed: [redis-node-2]
+
+TASK [Clean up nodes.conf compatibility issues for rolling upgrade] ************
+changed: [redis-node-2]
+
+TASK [Include redis role to compile and configure target version] **************
+included: redis for redis-node-2
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-2]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-2]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-2] => (item=/etc/redis)
+ok: [redis-node-2] => (item=/var/lib/redis)
+ok: [redis-node-2] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+changed: [redis-node-2]
+
+TASK [redis : Extract Redis source tarball] ************************************
+changed: [redis-node-2]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-2]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-2]
+
+TASK [redis : Create run directory] ********************************************
+ok: [redis-node-2]
+
+TASK [redis : Check if Redis is already running] *******************************
+fatal: [redis-node-2]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.005445'
+    end: '2026-06-15 11:18:23.221762'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 11:18:23.216317'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+...ignoring
+
+TASK [redis : Start Redis manually] ********************************************
+changed: [redis-node-2]
+
+TASK [redis : Wait for Redis to start] *****************************************
+ok: [redis-node-2]
+
+TASK [Wait for old master (now replica) to rejoin and sync] ********************
+FAILED - RETRYING: [redis-node-2]: Wait for old master (now replica) to rejoin and sync (30 retries left).
+FAILED - RETRYING: [redis-node-2]: Wait for old master (now replica) to rejoin and sync (29 retries left).
+ok: [redis-node-2]
+
+TASK [Check that cluster state is ok] ******************************************
+ok: [redis-node-2]
+
+TASK [Print upgrade progress and status] ***************************************
+ok: [redis-node-2] => 
+    msg: '[5/6] Upgraded master 10.10.0.12 — cluster: ok'
+
+PLAY [Rolling Upgrade Redis Master Nodes] **************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'redis-node-3' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-3]
+
+TASK [Run CLUSTER FAILOVER on the replica] *************************************
+changed: [redis-node-3 -> redis-node-4(127.0.0.1)]
+
+TASK [Wait for old master to become a replica] *********************************
+ok: [redis-node-3]
+
+TASK [Stop Redis on old master] ************************************************
+changed: [redis-node-3]
+
+TASK [Clean up nodes.conf compatibility issues for rolling upgrade] ************
+changed: [redis-node-3]
+
+TASK [Include redis role to compile and configure target version] **************
+included: redis for redis-node-3
+
+TASK [redis : Create redis group] **********************************************
+ok: [redis-node-3]
+
+TASK [redis : Create redis user] ***********************************************
+ok: [redis-node-3]
+
+TASK [redis : Create Redis directories] ****************************************
+ok: [redis-node-3] => (item=/etc/redis)
+ok: [redis-node-3] => (item=/var/lib/redis)
+ok: [redis-node-3] => (item=/var/log/redis)
+
+TASK [redis : Download Redis source tarball] ***********************************
+changed: [redis-node-3]
+
+TASK [redis : Extract Redis source tarball] ************************************
+changed: [redis-node-3]
+
+TASK [redis : Compile and install Redis from source] ***************************
+changed: [redis-node-3]
+
+TASK [redis : Template Redis configuration file] *******************************
+ok: [redis-node-3]
+
+TASK [redis : Create run directory] ********************************************
+ok: [redis-node-3]
+
+TASK [redis : Check if Redis is already running] *******************************
+fatal: [redis-node-3]: FAILED! => 
+    changed: false
+    cmd:
+    - pgrep
+    - -x
+    - redis-server
+    delta: '0:00:00.010657'
+    end: '2026-06-15 11:20:57.243978'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-06-15 11:20:57.233321'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+...ignoring
+
+TASK [redis : Start Redis manually] ********************************************
+changed: [redis-node-3]
+
+TASK [redis : Wait for Redis to start] *****************************************
+ok: [redis-node-3]
+
+TASK [Wait for old master (now replica) to rejoin and sync] ********************
+FAILED - RETRYING: [redis-node-3]: Wait for old master (now replica) to rejoin and sync (30 retries left).
+ok: [redis-node-3]
+
+TASK [Check that cluster state is ok] ******************************************
+ok: [redis-node-3]
+
+TASK [Print upgrade progress and status] ***************************************
+ok: [redis-node-3] => 
+    msg: '[6/6] Upgraded master 10.10.0.13 — cluster: ok'
+
+PLAY [Verify Upgrade and Data Integrity] ***************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [redis-node-1]
+
+TASK [Run data verification] ***************************************************
+ok: [redis-node-1]
+
+TASK [Display data verification output] ****************************************
+ok: [redis-node-1] => 
+    msg: PASS — 1000/1000 keys verified
+
+TASK [Run cluster status check] ************************************************
+ok: [redis-node-1]
+
+TASK [Display cluster status] **************************************************
+ok: [redis-node-1] => 
+    msg: |-
+        Cluster State: ok
+        MASTERS
+         10.10.0.14:6379 [master] v7.2.6 slots: 10923-16383 keys: 343 mem: 1.81M
+         10.10.0.15:6379 [master] v7.2.6 slots: 0-5460 keys: 334 mem: 1.81M
+         10.10.0.16:6379 [master] v7.2.6 slots: 5461-10922 keys: 324 mem: 1.80M
+        REPLICAS
+         10.10.0.11:6379 [replica] v7.2.6 replicating: 10.10.0.15:6379 mem: 1.74M
+         10.10.0.12:6379 [replica] v7.2.6 replicating: 10.10.0.16:6379 mem: 1.69M
+         10.10.0.13:6379 [replica] v7.2.6 replicating: 10.10.0.14:6379 mem: 1.69M
+        STATUS: ALL_OK
+
+TASK [Print upgrade complete confirmation] *************************************
+ok: [redis-node-1] => 
+    msg: UPGRADE COMPLETE — all nodes on v7.2.6, data integrity verified
 
 PLAY RECAP *********************************************************************
-redis-node-1               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
-redis-node-2               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
-redis-node-3               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
-redis-node-4               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
-redis-node-5               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
-redis-node-6               : ok=11   changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+redis-node-1               : ok=32   changed=7    unreachable=0    failed=0    skipped=1    rescued=0    ignored=1   
+redis-node-2               : ok=20   changed=7    unreachable=0    failed=0    skipped=0    rescued=0    ignored=1   
+redis-node-3               : ok=20   changed=7    unreachable=0    failed=0    skipped=0    rescued=0    ignored=1   
+redis-node-4               : ok=18   changed=6    unreachable=0    failed=0    skipped=0    rescued=0    ignored=1   
+redis-node-5               : ok=18   changed=6    unreachable=0    failed=0    skipped=0    rescued=0    ignored=1   
+redis-node-6               : ok=18   changed=6    unreachable=0    failed=0    skipped=0    rescued=0    ignored=1   
 

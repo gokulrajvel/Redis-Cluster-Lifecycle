@@ -1,0 +1,17 @@
+
+PLAY [Verify Seeded Data in Redis Cluster] *************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'redis-node-1' is using the discovered Python interpreter at '/usr/bin/python3.10', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [redis-node-1]
+
+TASK [Retrieve and verify all keys] ********************************************
+ok: [redis-node-1]
+
+TASK [Display Verification Results] ********************************************
+ok: [redis-node-1] => 
+    msg: PASS — 356/356 keys verified
+
+PLAY RECAP *********************************************************************
+redis-node-1               : ok=3    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
