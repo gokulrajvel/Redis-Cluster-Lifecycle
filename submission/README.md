@@ -37,6 +37,12 @@ Alternatively, you can manually build/start the containers (ensure SSH keys `id_
 
 This launches the 6 initial container nodes (and defines services for nodes 7 & 8 so they can be brought up dynamically during scaling operations).
 
+> [!IMPORTANT]
+> **SSH Key Permissions Troubleshooting**:
+> If you encounter an `UNREACHABLE!` error when running commands, with Ansible complaining that `Permissions 0664 for '../infra/id_rsa' are too open` (or similar too-open permissions) and ignoring the private key, run the following command from the root of the project directory to restrict access permissions:
+> ```bash
+> chmod 600 infra/id_rsa
+> ```
 
 ---
 
