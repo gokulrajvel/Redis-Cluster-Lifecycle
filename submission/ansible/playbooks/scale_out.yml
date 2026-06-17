@@ -1,0 +1,70 @@
+---
+- name: Provision New Redis Nodes
+  hosts: new_nodes
+  become: yes
+  roles:
+    - role: redis
+      redis_version: "{{ target_version }}"
+
+- name: Integrate New Nodes into Cluster and Rebalance
+  hosts: cluster_master
+  become: yes
+  tasks:
+    - name: Wait for redis-node-7 to be ready
+      command: redis-cli -h 10.10.0.17 -p 6379 ping
+      register: ping7
+      until: "'PONG' in ping7.stdout"
+      retries: 30
+      delay: 2
+      changed_when: false
+
+    - name: Wait for redis-node-8 to be ready
+      command: redis-cli -h 10.10.0.18 -p 6379 ping
+      register: ping8
+      until: "'PONG' in ping8.stdout"
+      retries: 30
+      delay: 2
+      changed_when: false
+
+    - name: Add redis-node-7 (10.10.0.17:6379) to cluster as master
+      command: redis-cli --cluster add-node 10.10.0.17:6379 10.10.0.11:6379
+      register: add_master_out
+      changed_when: true
+
+    - name: Wait for cluster to acknowledge the new master
+      pause:
+        seconds: 5
+
+    - name: Fetch node ID of the newly added master (redis-node-7)
+      command: redis-cli -h 10.10.0.17 -p 6379 cluster myid
+      register: new_master_id
+      changed_when: false
+
+    - name: Add redis-node-8 (10.10.0.18:6379) as replica of redis-node-7
+      command: >
+        redis-cli --cluster add-node 10.10.0.18:6379 10.10.0.11:6379
+        --cluster-slave --cluster-master-id {{ new_master_id.stdout | trim }}
+      register: add_replica_out
+      changed_when: true
+
+    - name: Wait for topology to propagate
+      pause:
+        seconds: 5
+
+    - name: Rebalance hash slots across all masters (including the new empty one)
+      command: redis-cli --cluster rebalance 10.10.0.11:6379 --cluster-use-empty-masters
+      register: rebalance_out
+      changed_when: true
+
+    - name: Display rebalance result
+      debug:
+        msg: "{{ rebalance_out.stdout }}"
+
+    - name: Show final cluster topology
+      command: redis-cli -h 10.10.0.11 -p 6379 cluster nodes
+      register: final_nodes
+      changed_when: false
+
+    - name: Display final cluster nodes
+      debug:
+        msg: "{{ final_nodes.stdout }}"

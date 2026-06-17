@@ -26,24 +26,59 @@
     - "{{ redis_dir }}"
     - "{{ redis_log_dir }}"
 
+# --- S4 Idempotency: Check installed version before compiling ---
+- name: Check if redis-server binary exists
+  stat:
+    path: /usr/local/bin/redis-server
+  register: redis_binary
+
+- name: Get installed Redis version
+  command: /usr/local/bin/redis-server --version
+  register: installed_version_output
+  changed_when: false
+  when: redis_binary.stat.exists
+
+- name: Determine if compilation is needed
+  set_fact:
+    redis_needs_compile: >-
+      {{ not redis_binary.stat.exists or
+         (redis_version not in (installed_version_output.stdout | default(''))) }}
+
+- name: Skip compilation message
+  debug:
+    msg: "Redis {{ redis_version }} already installed — skipping download and compile"
+  when: not (redis_needs_compile | bool)
+# --- End S4 idempotency check ---
+
 - name: Download Redis source tarball
   get_url:
     url: "{{ redis_download_url }}"
     dest: "/tmp/redis-{{ redis_version }}.tar.gz"
     mode: '0644'
+  when: redis_needs_compile | bool
+
+- name: Clean existing Redis source directory
+  file:
+    path: "/tmp/redis-{{ redis_version }}"
+    state: absent
+  when: redis_needs_compile | bool
 
 - name: Extract Redis source tarball
   unarchive:
     src: "/tmp/redis-{{ redis_version }}.tar.gz"
     dest: "/tmp"
     remote_src: yes
+  when: redis_needs_compile | bool
 
 - name: Compile and install Redis from source
   make:
     chdir: "/tmp/redis-{{ redis_version }}"
     target: install
+    jobs: 1
   become: yes
+  when: redis_needs_compile | bool
 
+# Config template always runs (in case config changed)
 - name: Template Redis configuration file
   template:
     src: redis.conf.j2
@@ -51,6 +86,7 @@
     owner: "{{ redis_user }}"
     group: "{{ redis_group }}"
     mode: '0644'
+  notify: Restart Redis (Manual)
 
 - name: Create run directory
   file:
@@ -63,7 +99,7 @@
 - name: Check if Redis is already running
   command: pgrep -x redis-server
   register: redis_running
-  ignore_errors: yes
+  failed_when: false
   changed_when: false
 
 - name: Start Redis manually

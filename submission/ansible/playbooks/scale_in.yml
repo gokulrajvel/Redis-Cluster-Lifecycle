@@ -1,0 +1,155 @@
+---
+- name: Migrate slots and remove target node from cluster
+  hosts: redis-node-1
+  become: yes
+  tasks:
+    - name: Run scale-in migration and deletion script
+      shell: |
+        python3 << 'PYEOF'
+        import subprocess
+        import json
+        import sys
+
+        remove_node_id = "{{ remove_node_id }}"
+
+        def get_output(cmd):
+            try:
+                res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                return res.stdout
+            except Exception:
+                return ""
+
+        nodes_output = get_output("redis-cli -h 127.0.0.1 -p 6379 cluster nodes")
+        nodes = []
+        for line in nodes_output.splitlines():
+            if not line.strip():
+                continue
+            parts = line.split()
+            if len(parts) < 8:
+                continue
+            nodes.append(parts)
+
+        target_node = None
+        for parts in nodes:
+            if parts[0] == remove_node_id:
+                target_node = parts
+                break
+
+        if not target_node:
+            print(json.dumps({"error": f"Node ID {remove_node_id} not found in cluster"}))
+            sys.exit(1)
+
+        flags = target_node[2]
+        if "master" not in flags:
+            print(json.dumps({"error": f"Node ID {remove_node_id} is not a master node"}))
+            sys.exit(1)
+
+        # Find replica of the target master
+        replica_node = None
+        for parts in nodes:
+            if len(parts) >= 4 and parts[3] == remove_node_id:
+                replica_node = parts
+                break
+
+        master_ip_port = target_node[1].split("@")[0].split(",")[0]
+        master_ip = master_ip_port.split(":")[0]
+
+        replica_ip = None
+        replica_node_id = None
+        if replica_node:
+            replica_node_id = replica_node[0]
+            replica_ip_port = replica_node[1].split("@")[0].split(",")[0]
+            replica_ip = replica_ip_port.split(":")[0]
+
+        # Determine mapping to ansible hosts based on IP addresses
+        ip_to_host = {
+            "10.10.0.11": "redis-node-1",
+            "10.10.0.12": "redis-node-2",
+            "10.10.0.13": "redis-node-3",
+            "10.10.0.14": "redis-node-4",
+            "10.10.0.15": "redis-node-5",
+            "10.10.0.16": "redis-node-6",
+            "10.10.0.17": "redis-node-7",
+            "10.10.0.18": "redis-node-8"
+        }
+
+        master_host = ip_to_host.get(master_ip)
+        replica_host = ip_to_host.get(replica_ip) if replica_ip else None
+
+        # Find a destination master (not the target master, and is healthy master)
+        dest_master = None
+        for parts in nodes:
+            if parts[0] != remove_node_id and "master" in parts[2] and "fail" not in parts[2]:
+                dest_master = parts
+                break
+
+        if not dest_master:
+            print(json.dumps({"error": "No other healthy master node found in cluster to migrate slots to"}))
+            sys.exit(1)
+
+        dest_master_id = dest_master[0]
+
+        # Calculate slots
+        total_slots = 0
+        for part in target_node[8:]:
+            if part.startswith('['):
+                continue
+            if '-' in part:
+                start, end = part.split('-')
+                total_slots += int(end) - int(start) + 1
+            else:
+                total_slots += 1
+
+        # Migrate slots if any
+        if total_slots > 0:
+            reshard_cmd = f"redis-cli --cluster reshard 127.0.0.1:6379 --cluster-from {remove_node_id} --cluster-to {dest_master_id} --cluster-slots {total_slots} --cluster-yes"
+            res = subprocess.run(reshard_cmd, shell=True, capture_output=True, text=True)
+            if res.returncode != 0:
+                print(json.dumps({"error": f"Resharding failed: {res.stderr or res.stdout}"}))
+                sys.exit(1)
+
+        # Remove replica node from cluster first
+        if replica_node_id:
+            del_replica_cmd = f"redis-cli --cluster del-node 127.0.0.1:6379 {replica_node_id}"
+            res = subprocess.run(del_replica_cmd, shell=True, capture_output=True, text=True)
+            if res.returncode != 0:
+                print(json.dumps({"error": f"Failed to delete replica node: {res.stderr or res.stdout}"}))
+                sys.exit(1)
+
+        # Remove master node from cluster
+        del_master_cmd = f"redis-cli --cluster del-node 127.0.0.1:6379 {remove_node_id}"
+        res = subprocess.run(del_master_cmd, shell=True, capture_output=True, text=True)
+        if res.returncode != 0:
+            print(json.dumps({"error": f"Failed to delete master node: {res.stderr or res.stdout}"}))
+            sys.exit(1)
+
+        out_data = {
+            "master_host": master_host,
+            "replica_host": replica_host,
+            "master_ip": master_ip,
+            "replica_ip": replica_ip,
+            "status": "success",
+            "total_slots_migrated": total_slots,
+            "dest_master_id": dest_master_id
+        }
+        print(json.dumps(out_data))
+        PYEOF
+      register: migration_result
+      changed_when: true
+
+    - name: Check if migration script failed
+      fail:
+        msg: "Migration failed: {{ migration_result.stdout }}"
+      when: migration_result.rc != 0 or '"error"' in migration_result.stdout
+
+    - name: Parse migration output
+      set_fact:
+        scale_in_facts: "{{ migration_result.stdout | from_json }}"
+
+- name: Stop Redis on removed nodes
+  hosts: "{{ hostvars['redis-node-1']['scale_in_facts']['master_host'] }}{% if hostvars['redis-node-1']['scale_in_facts']['replica_host'] %},{{ hostvars['redis-node-1']['scale_in_facts']['replica_host'] }}{% endif %}"
+  become: yes
+  tasks:
+    - name: Stop Redis with pkill
+      command: pkill redis-server
+      failed_when: false

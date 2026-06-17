@@ -8,7 +8,6 @@
         python3 << 'PYEOF'
         import subprocess
         import hashlib
-        import re
 
         # Query masters list first to perform FLUSHDB and then display distribution
         nodes_res = subprocess.run(["redis-cli", "-h", "127.0.0.1", "-p", "6379", "cluster", "nodes"], capture_output=True, text=True)
@@ -17,7 +16,7 @@
             if "master" in line:
                 parts = line.split()
                 if len(parts) >= 2:
-                    ip_port = parts[1].split("@")[0]
+                    ip_port = parts[1].split("@")[0].split(",")[0]
                     masters.append(ip_port)
 
         # Flush all master databases to guarantee clean, accurate seeding metrics

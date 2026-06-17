@@ -4,10 +4,18 @@ import sys
 import shutil
 import re
 import subprocess
+import json
+import time
+from datetime import datetime
 
 # Define directory structures relative to script location
 SUBMISSION_DIR = os.path.dirname(os.path.abspath(__file__))
 ANSIBLE_DIR = os.path.join(SUBMISSION_DIR, "ansible")
+
+# --- S5: Structured Logging Setup ---
+LOGS_DIR = os.path.join(SUBMISSION_DIR, "logs")
+os.makedirs(LOGS_DIR, exist_ok=True)
+# --- End S5 Setup ---
 
 def check_prerequisites():
     """Verify Docker/Podman and Ansible 2.14+ are installed on the system."""
@@ -19,9 +27,29 @@ def check_prerequisites():
     docker_exists = shutil.which("docker") is not None
     podman_exists = shutil.which("podman") is not None
 
+    runtime_env = os.environ.get("CONTAINER_RUNTIME", "").lower()
     runtime_name = None
     runtime_version = "unknown"
-    if podman_exists:
+
+    if runtime_env == "docker" and docker_exists:
+        runtime_name = "Docker"
+        try:
+            res = subprocess.run(["docker", "--version"], capture_output=True, text=True, check=True)
+            match = re.search(r'version\s+(\d+\.\d+\.\d+)', res.stdout)
+            if match:
+                runtime_version = match.group(1)
+        except Exception:
+            pass
+    elif runtime_env == "podman" and podman_exists:
+        runtime_name = "Podman"
+        try:
+            res = subprocess.run(["podman", "--version"], capture_output=True, text=True, check=True)
+            match = re.search(r'version\s+(\d+\.\d+\.\d+)', res.stdout)
+            if match:
+                runtime_version = match.group(1)
+        except Exception:
+            pass
+    elif podman_exists:
         runtime_name = "Podman"
         try:
             res = subprocess.run(["podman", "--version"], capture_output=True, text=True, check=True)
@@ -108,6 +136,57 @@ def run_playbook(cmd, log_filename=None):
         result = subprocess.run(cmd, cwd=ANSIBLE_DIR)
         return result.returncode
 
+# --- S5: Structured Logging Functions ---
+def write_structured_log(command_name, args_dict, ansible_cmd, return_code, duration, log_filename, error_msg=None):
+    """Write a JSON log file and append a summary line to operations.log."""
+    now = datetime.now()
+    timestamp_str = now.strftime("%Y-%m-%dT%H:%M:%S")
+    file_timestamp = now.strftime("%Y%m%d_%H%M%S")
+
+    status = "success" if return_code == 0 else "failed"
+
+    # Build the JSON log entry
+    log_entry = {
+        "timestamp": timestamp_str,
+        "command": command_name,
+        "args": args_dict,
+        "ansible_command": " ".join(ansible_cmd) if ansible_cmd else "",
+        "status": status,
+        "return_code": return_code,
+        "duration_seconds": round(duration, 1),
+        "output_file": f"output/{log_filename}" if log_filename else ""
+    }
+    if error_msg:
+        log_entry["error"] = error_msg
+
+    # Write per-operation JSON log file
+    json_log_path = os.path.join(LOGS_DIR, f"{command_name}_{file_timestamp}.json")
+    with open(json_log_path, "w") as f:
+        json.dump(log_entry, f, indent=2)
+
+    # Append one-line summary to operations.log
+    ops_log_path = os.path.join(LOGS_DIR, "operations.log")
+    summary = f"{timestamp_str} | {command_name} | {status} | {round(duration, 1)}s"
+    if error_msg:
+        summary += f" | {error_msg}"
+    elif status == "success":
+        # Add a brief description based on the command
+        if command_name == "upgrade" and "target_version" in args_dict:
+            summary += f" | all nodes on v{args_dict['target_version']}"
+        elif command_name == "provision" and "version" in args_dict:
+            summary += f" | cluster v{args_dict['version']}"
+        elif command_name == "rollback" and "target_version" in args_dict:
+            summary += f" | rolled back to v{args_dict['target_version']}"
+        elif command_name == "scale_out":
+            summary += " | added 2 new nodes"
+        elif command_name == "scale_in" and "remove_node" in args_dict:
+            summary += f" | removed node {args_dict['remove_node']}"
+    with open(ops_log_path, "a") as f:
+        f.write(summary + "\n")
+
+    return json_log_path
+# --- End S5 Structured Logging Functions ---
+
 def main():
     check_prerequisites()
 
@@ -145,13 +224,31 @@ def main():
     verify_parser.add_argument("--full", action="store_true", help="Perform a full verification check")
     verify_parser.add_argument("--keys", type=int, help="Number of keys to verify (defaults to metadata:num_keys or 1000)")
 
+    # 6. scale
+    scale_parser = subparsers.add_parser("scale", help="Scale the Redis Cluster")
+    scale_group = scale_parser.add_mutually_exclusive_group(required=True)
+    scale_group.add_argument("--add-nodes", type=int, choices=[2], help="Number of nodes to add (must be 2)")
+    scale_group.add_argument("--remove-node", help="Node ID of the master node to remove")
+
+    # 7. rollback
+    rollback_parser = subparsers.add_parser("rollback", help="Roll back the Redis Cluster nodes to a target version")
+    rollback_parser.add_argument("--target-version", default="7.0.15", required=True, help="Target Redis version to roll back to")
+    rollback_parser.add_argument("--keys", type=int, help="Number of keys to verify during baseline and final checks (defaults to metadata:num_keys or 1000)")
+
     args = parser.parse_args()
+
+    # --- S5: Capture start time and build args dict for logging ---
+    start_time = time.time()
+    command_name = args.command
+    args_dict = {}
+    # --- End S5 capture ---
 
     # Determine command execution list and log files
     cmd = []
     log_filename = None
 
     if args.command == "provision":
+        args_dict = {"version": args.version, "masters": args.masters, "replicas_per_master": args.replicas_per_master}
         cmd = [
             "ansible-playbook",
             "-i", "inventory/hosts.ini",
@@ -162,6 +259,7 @@ def main():
         log_filename = "provision_output.txt"
 
     elif args.command == "status":
+        args_dict = {}
         cmd = [
             "ansible-playbook",
             "-i", "inventory/hosts.ini",
@@ -170,6 +268,9 @@ def main():
         log_filename = "status_output.txt"
 
     elif args.command == "upgrade":
+        args_dict = {"target_version": args.target_version, "strategy": args.strategy}
+        if args.keys is not None:
+            args_dict["keys"] = args.keys
         cmd = [
             "ansible-playbook",
             "-i", "inventory/hosts.ini",
@@ -181,6 +282,8 @@ def main():
         log_filename = "upgrade_output.txt"
 
     elif args.command == "data" and args.data_command == "seed":
+        command_name = "data_seed"
+        args_dict = {"keys": args.keys}
         cmd = [
             "ansible-playbook",
             "-i", "inventory/hosts.ini",
@@ -190,6 +293,10 @@ def main():
         log_filename = "data_seed_output.txt"
 
     elif args.command == "data" and args.data_command == "verify":
+        command_name = "data_verify"
+        args_dict = {}
+        if args.keys is not None:
+            args_dict["keys"] = args.keys
         cmd = [
             "ansible-playbook",
             "-i", "inventory/hosts.ini",
@@ -200,6 +307,9 @@ def main():
         log_filename = "data_verify_output.txt"
 
     elif args.command == "verify":
+        args_dict = {"full": args.full}
+        if args.keys is not None:
+            args_dict["keys"] = args.keys
         cmd = [
             "ansible-playbook",
             "-i", "inventory/hosts.ini",
@@ -211,9 +321,117 @@ def main():
             cmd.extend(["-e", f"num_keys={args.keys}"])
         log_filename = "verify_output.txt"
 
+    elif args.command == "scale":
+        if args.add_nodes:
+            command_name = "scale_out"
+            args_dict = {"add_nodes": args.add_nodes}
+
+            # Step 1: Start new node containers via podman-compose
+            infra_dir = os.path.join(SUBMISSION_DIR, "infra")
+            print("Starting new node containers (redis-node-7, redis-node-8)...")
+
+            # Try podman-compose first, then docker-compose
+            compose_cmd = None
+            if shutil.which("podman-compose"):
+                compose_cmd = ["podman-compose", "up", "-d", "redis-node-7", "redis-node-8"]
+            elif shutil.which("podman") and shutil.which("podman"):
+                compose_cmd = ["podman", "compose", "up", "-d", "redis-node-7", "redis-node-8"]
+            elif shutil.which("docker"):
+                compose_cmd = ["docker", "compose", "up", "-d", "redis-node-7", "redis-node-8"]
+
+            if compose_cmd:
+                compose_result = subprocess.run(compose_cmd, cwd=infra_dir, capture_output=True, text=True)
+                if compose_result.returncode != 0:
+                    print(f"Warning: Container start returned non-zero: {compose_result.stderr}")
+                else:
+                    print("✓ New node containers started")
+            else:
+                print("✗ No compose tool found (podman-compose/docker compose)")
+                # --- S5: Log the failure ---
+                duration = time.time() - start_time
+                write_structured_log(command_name, args_dict, [], 1, duration, None, "No compose tool found")
+                sys.exit(1)
+
+            # Step 2: Wait for SSH to be ready on new nodes
+            import socket
+            print("Waiting for SSH on new nodes...")
+            for port in [2307, 2308]:
+                for attempt in range(30):
+                    try:
+                        s = socket.create_connection(("127.0.0.1", port), timeout=2)
+                        s.close()
+                        print(f"  ✓ Port {port} ready")
+                        break
+                    except (ConnectionRefusedError, OSError):
+                        time.sleep(1)
+                else:
+                    print(f"  ✗ Timed out waiting for port {port}")
+                    # --- S5: Log the failure ---
+                    duration = time.time() - start_time
+                    write_structured_log(command_name, args_dict, [], 1, duration, None, f"SSH timeout on port {port}")
+                    sys.exit(1)
+
+            # Step 3: Detect current Redis version from existing cluster
+            target_version = "7.0.15"
+            for detect_port in [6471, 6472, 6473, 6474, 6475, 6476]:
+                try:
+                    res = subprocess.run(
+                        ["redis-cli", "-h", "127.0.0.1", "-p", str(detect_port), "info", "server"],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    match = re.search(r'redis_version:(\d+\.\d+\.\d+)', res.stdout)
+                    if match:
+                        target_version = match.group(1)
+                        break
+                except Exception:
+                    continue
+            print(f"Detected cluster version: {target_version}")
+
+            cmd = [
+                "ansible-playbook",
+                "-i", "inventory/hosts.ini",
+                "playbooks/scale_out.yml",
+                "-e", f"target_version={target_version}"
+            ]
+            log_filename = "scale_out_output.txt"
+        elif args.remove_node:
+            command_name = "scale_in"
+            args_dict = {"remove_node": args.remove_node}
+            cmd = [
+                "ansible-playbook",
+                "-i", "inventory/hosts.ini",
+                "playbooks/scale_in.yml",
+                "-e", f"remove_node_id={args.remove_node}"
+            ]
+            log_filename = "scale_in_output.txt"
+
+    elif args.command == "rollback":
+        args_dict = {"target_version": args.target_version}
+        if args.keys is not None:
+            args_dict["keys"] = args.keys
+        cmd = [
+            "ansible-playbook",
+            "-i", "inventory/hosts.ini",
+            "playbooks/rollback.yml",
+            "-e", f"target_version={args.target_version}"
+        ]
+        if args.keys is not None:
+            cmd.extend(["-e", f"num_keys={args.keys}"])
+        log_filename = "rollback_output.txt"
+
     # Execute
     return_code = run_playbook(cmd, log_filename)
-    if return_code == 0 and args.command == "provision":
+
+    # --- S5: Write structured log after execution ---
+    duration = time.time() - start_time
+    error_msg = None
+    if return_code != 0:
+        error_msg = f"ansible-playbook exited with code {return_code}"
+    json_log = write_structured_log(command_name, args_dict, cmd, return_code, duration, log_filename, error_msg)
+    print(f"Log written to {json_log}")
+    # --- End S5 ---
+
+    if return_code == 0 and args.command in ("provision", "scale"):
         print("\n--- Final Cluster Topology ---")
         status_cmd = [
             "ansible-playbook",
@@ -225,5 +443,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

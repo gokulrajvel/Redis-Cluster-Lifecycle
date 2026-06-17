@@ -72,7 +72,7 @@
             if line.strip():
                 parts = line.split()
                 if len(parts) >= 2:
-                    ip_port = parts[1].split("@")[0]
+                    ip_port = parts[1].split("@")[0].split(",")[0]
                     nodes.append(ip_port)
 
         versions = {}
@@ -136,7 +136,7 @@
             if len(parts) < 8: continue
             flags = parts[2]
             if "slave" in flags or "replica" in flags:
-                ip_port = parts[1].split("@")[0]
+                ip_port = parts[1].split("@")[0].split(",")[0]
                 r_ip, r_port = ip_port.split(":")
                 repl_res = subprocess.run(["redis-cli", "-h", r_ip, "-p", r_port, "INFO", "replication"], capture_output=True, text=True)
                 link_up = "master_link_status:up" in repl_res.stdout

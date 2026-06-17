@@ -32,7 +32,7 @@
             if len(parts) < 8:
                 continue
             node_id = parts[0]
-            ip_port = parts[1].split("@")[0]
+            ip_port = parts[1].split("@")[0].split(",")[0]
             id_to_ip[node_id] = ip_port
             nodes.append(parts)
 
@@ -41,7 +41,7 @@
 
         for parts in nodes:
             node_id = parts[0]
-            ip_port = parts[1].split("@")[0]
+            ip_port = parts[1].split("@")[0].split(",")[0]
             ip = ip_port.split(":")[0]
             port = ip_port.split(":")[1]
             flags = parts[2]
@@ -62,7 +62,8 @@
             if "master" in flags:
                 slots = ""
                 if len(parts) > 8:
-                    slots = parts[8]
+                    clean = [p for p in parts[8:] if not p.startswith("[")]
+                    slots = " ".join(clean)
                 info_keys = get_output("redis-cli -h " + ip + " -p " + port + " INFO keyspace")
                 keys = 0
                 for line in info_keys.splitlines():
@@ -91,11 +92,11 @@
         print("Cluster State: " + state)
         print("MASTERS")
         for m in masters:
-            print(" " + m["ip_port"] + " [master] v" + m["version"] + " slots: " + m["slots"] + " keys: " + str(m["keys"]) + " mem: " + m["mem"])
+            print(" " + m["ip_port"] + " [master] v" + m["version"] + " slots:" + m["slots"] + " keys:" + str(m["keys"]) + " mem:" + m["mem"])
         print("REPLICAS")
         for r in replicas:
             master_ip_port = id_to_ip.get(r["master_id"], "unknown")
-            print(" " + r["ip_port"] + " [replica] v" + r["version"] + " replicating: " + master_ip_port + " mem: " + r["mem"])
+            print(" " + r["ip_port"] + " [replica] v" + r["version"] + " replicating:" + master_ip_port + " mem:" + r["mem"])
         PYEOF
       register: cluster_status
       changed_when: false

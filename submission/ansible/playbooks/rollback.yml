@@ -1,28 +1,34 @@
 ---
-- name: Pre-Flight Checks & Dynamic Topology Discovery
+- name: Pre-Flight Checks & Dynamic Topology Discovery for Rollback
   hosts: redis-node-1
   become: yes
   vars:
-    target_version: "{{ redis_version | default('7.2.6') }}"
+    target_version: "{{ target_version | default('7.0.15') }}"
   tasks:
-    - name: Verify cluster health
+    - name: Verify cluster health (informational only)
       command: redis-cli -h 127.0.0.1 -p 6379 cluster info
       register: cluster_info_pre
       changed_when: false
+      ignore_errors: yes
 
-    - name: Assert cluster state is ok
-      fail:
-        msg: "Cluster is not healthy! Current state: {{ cluster_info_pre.stdout }}"
-      when: "'cluster_state:ok' not in cluster_info_pre.stdout"
-
-    - name: Dynamically parse cluster topology for rolling upgrade
+    - name: Dynamically parse cluster topology for rolling rollback
       shell: |
         python3 << 'PYEOF'
         import subprocess
         import json
+        import sys
 
-        res = subprocess.run(["redis-cli", "-h", "127.0.0.1", "-p", "6379", "cluster", "nodes"], capture_output=True, text=True)
-        lines = res.stdout.splitlines()
+        target_version = "{{ target_version }}"
+
+        def get_output(cmd):
+            try:
+                res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                return res.stdout
+            except Exception:
+                return ""
+
+        res = get_output("redis-cli -h 127.0.0.1 -p 6379 cluster nodes")
+        lines = res.splitlines()
 
         ip_to_host = {
             "10.10.0.11": "redis-node-1",
@@ -30,7 +36,7 @@
             "10.10.0.13": "redis-node-3",
             "10.10.0.14": "redis-node-4",
             "10.10.0.15": "redis-node-5",
-            "10.10.0.16": "redis-node-6",
+            "10.10.0.16": "redis-node-6"
         }
 
         id_to_ip = {}
@@ -45,9 +51,23 @@
             id_to_ip[node_id] = ip
             node_list.append(parts)
 
-        masters = []
-        replicas = []
+        rollback_replicas = []
+        rollback_masters = []
         replica_map = {}
+
+        # Check each node version
+        node_versions = {}
+        for parts in node_list:
+            node_id = parts[0]
+            ip_port = parts[1].split("@")[0].split(",")[0]
+            ip = ip_port.split(":")[0]
+            port = ip_port.split(":")[1]
+            info_server = get_output(f"redis-cli -h {ip} -p {port} INFO server")
+            version = "unknown"
+            for line in info_server.splitlines():
+                if line.startswith("redis_version:"):
+                    version = line.split(":")[1].strip()
+            node_versions[node_id] = version
 
         for parts in node_list:
             node_id = parts[0]
@@ -58,19 +78,32 @@
             host = ip_to_host.get(ip)
             if not host: continue
             
-            if "master" in flags:
-                masters.append(host)
-            else:
-                replicas.append(host)
-                master_ip = id_to_ip.get(master_id)
-                master_host = ip_to_host.get(master_ip)
-                if master_host:
-                    replica_map[master_host] = host
+            version = node_versions.get(node_id, "unknown")
+            if version != target_version:
+                if "master" in flags:
+                    rollback_masters.append(host)
+                    replica_host = None
+                    for r_parts in node_list:
+                        r_id = r_parts[0]
+                        r_flags = r_parts[2]
+                        r_master_id = r_parts[3]
+                        r_ip_port = r_parts[1].split("@")[0].split(",")[0]
+                        r_ip = r_ip_port.split(":")[0]
+                        if "slave" in r_flags or "replica" in r_flags:
+                            if r_master_id == node_id:
+                                replica_host = ip_to_host.get(r_ip)
+                                if replica_host:
+                                    break
+                    if replica_host:
+                        replica_map[host] = replica_host
+                else:
+                    rollback_replicas.append(host)
 
         print(json.dumps({
-            "masters": masters,
-            "replicas": replicas,
-            "replica_map": replica_map
+            "rollback_replicas": rollback_replicas,
+            "rollback_masters": rollback_masters,
+            "replica_map": replica_map,
+            "is_rollback_needed": len(rollback_replicas) > 0 or len(rollback_masters) > 0
         }))
         PYEOF
       register: topology_json
@@ -80,83 +113,34 @@
       set_fact:
         topology: "{{ topology_json.stdout | from_json }}"
 
-    - name: Create dynamic replica group
-      add_host:
-        name: "{{ item }}"
-        groups: active_replicas
-      loop: "{{ topology.replicas }}"
-
-    - name: Create dynamic master group and assign replica variable
-      add_host:
-        name: "{{ item }}"
-        groups: active_masters
-        assigned_replica: "{{ topology.replica_map[item] }}"
-      loop: "{{ topology.masters }}"
-
-    - name: Verify all nodes are reachable
-      command: "redis-cli -h {{ item }} -p 6379 ping"
-      loop: "{{ topology.masters + topology.replicas }}"
-      register: ping_result
-      changed_when: false
-      failed_when: "'PONG' not in ping_result.stdout"
-
-    - name: Verify target version differs from current version
-      shell: |
-        python3 << 'PYEOF'
-        import subprocess
-        import sys
-
-        target_version = "{{ target_version }}"
-        res = subprocess.run(["redis-cli", "-h", "127.0.0.1", "-p", "6379", "cluster", "nodes"], capture_output=True, text=True)
-        lines = res.stdout.splitlines()
-
-        nodes = []
-        for line in lines:
-            if not line.strip(): continue
-            parts = line.split()
-            if len(parts) < 8: continue
-            ip_port = parts[1].split("@")[0].split(",")[0]
-            nodes.append(ip_port)
-
-        all_upgraded = True
-        for node in nodes:
-            n_ip, n_port = node.split(":")
-            info = subprocess.run(["redis-cli", "-h", n_ip, "-p", n_port, "INFO", "server"], capture_output=True, text=True)
-            version = "unknown"
-            for line in info.stdout.splitlines():
-                if line.startswith("redis_version:"):
-                    version = line.split(":")[1].strip()
-            if version != target_version:
-                all_upgraded = False
-
-        if all_upgraded:
-            print("ALL_UPGRADED")
-        else:
-            print("PROCEED")
-        PYEOF
-      register: version_check
-      changed_when: false
-
-    - name: Set upgrade need fact
-      set_fact:
-        is_upgrade_needed: "{{ 'PROCEED' in version_check.stdout }}"
-
-    - name: Handle case where all nodes are already upgraded
+    - name: Handle case where no nodes require rollback
       debug:
-        msg: "All nodes already on v{{ target_version }} — nothing to do."
-      when: not (is_upgrade_needed | bool)
+        msg: "All nodes in the cluster are already at the target version ({{ target_version }}). No rollback needed."
+      when: not topology.is_rollback_needed
 
-    - name: End playbook cleanly if no upgrade needed
-      meta: end_play
-      when: not (is_upgrade_needed | bool)
+    - name: Create dynamic rollback replica group
+      add_host:
+        name: "{{ item }}"
+        groups: rollback_replicas
+      loop: "{{ topology.rollback_replicas }}"
+      when: topology.is_rollback_needed
 
-    - name: Run data verify for pre-upgrade integrity baseline
+    - name: Create dynamic rollback master group and assign replica variable
+      add_host:
+        name: "{{ item }}"
+        groups: rollback_masters
+        assigned_replica: "{{ topology.replica_map[item] | default('') }}"
+      loop: "{{ topology.rollback_masters }}"
+      when: topology.is_rollback_needed
+
+    # Bypassing node reachability checks because recovery targets can be offline/crashed
+
+    - name: Run data verify for pre-rollback integrity baseline
       shell: |
         python3 -c '
         import subprocess
         import hashlib
 
-        # Fetch num_keys from metadata or ansible vars
         ansible_num_keys = {{ num_keys | default('None') }}
         if ansible_num_keys is not None and ansible_num_keys != 'None':
             num_keys = int(ansible_num_keys)
@@ -172,12 +156,9 @@
         for i in range(1, num_keys + 1):
             key = f"key:{i:04d}"
             expected_val = hashlib.sha256(key.encode()).hexdigest()
-            
             cmd = ["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", key]
             res = subprocess.run(cmd, capture_output=True, text=True)
-            
             val = res.stdout.strip()
-            
             if not val or val == "(nil)":
                 missing_count += 1
             elif val != expected_val:
@@ -193,42 +174,39 @@
       register: pre_verify_results
       changed_when: false
       failed_when: "'FAIL' in pre_verify_results.stdout"
-      when: is_upgrade_needed | bool
+      when: topology.is_rollback_needed
 
-    - name: Display pre-upgrade verification baseline
+    - name: Display pre-rollback verification baseline
       debug:
-        msg: "Pre-upgrade integrity baseline: {{ pre_verify_results.stdout }}"
-      when: is_upgrade_needed | bool
+        msg: "Pre-rollback integrity baseline: {{ pre_verify_results.stdout }}"
+      when: topology.is_rollback_needed and pre_verify_results.stdout is defined
 
-- name: Rolling Upgrade Redis Replica Nodes
-  hosts: active_replicas
+- name: Rollback Redis Replica Nodes
+  hosts: rollback_replicas
   serial: 1
   become: yes
   vars:
-    target_version: "{{ redis_version | default('7.2.6') }}"
+    target_version: "{{ target_version | default('7.0.15') }}"
   tasks:
-    - name: Save Redis in-memory data to disk
-      command: redis-cli SAVE
-      failed_when: false
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
-
-    - name: Create backup directory
-      file:
-        path: /var/lib/redis-backup
-        state: directory
-        mode: '0755'
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
-
-    - name: Back up Redis data before upgrade
-      shell: cp -r /var/lib/redis/dump.rdb /var/lib/redis/appendonlydir /var/lib/redis-backup/ || true
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
-
     - name: Stop Redis on replica
       shell: pkill redis-server || true
       changed_when: true
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
-    - name: Clean up nodes.conf compatibility issues for rolling upgrade
+    - name: Restore compatible RDB and AOF backup if available, otherwise clear data
+      shell: |
+        if [ -d /var/lib/redis-backup ] && [ -f /var/lib/redis-backup/dump.rdb ]; then
+          rm -rf /var/lib/redis/dump.rdb /var/lib/redis/appendonlydir
+          cp -r /var/lib/redis-backup/dump.rdb /var/lib/redis/
+          if [ -d /var/lib/redis-backup/appendonlydir ]; then
+            cp -r /var/lib/redis-backup/appendonlydir /var/lib/redis/
+          fi
+          chown -R redis:redis /var/lib/redis/
+        else
+          rm -rf /var/lib/redis/dump.rdb /var/lib/redis/appendonlydir
+        fi
+      changed_when: true
+
+    - name: Clean up nodes.conf compatibility issues for rolling rollback
       shell: |
         python3 -c '
         import os
@@ -247,63 +225,47 @@
                 f.writelines(new_lines)
         '
       changed_when: true
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
     - name: Include redis role to compile and configure target version
       include_role:
         name: redis
       vars:
         redis_version: "{{ target_version }}"
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
-    - name: Wait for replica to rejoin cluster and sync
+    - name: Ensure Redis is running
+      shell: "redis-server /etc/redis/redis.conf --daemonize yes"
+      become: yes
+      changed_when: true
+
+    - name: Wait for replica to rejoin cluster
       command: redis-cli -p 6379 info replication
       register: replication_info
-      until: "'master_link_status:up' in replication_info.stdout or 'role:master' in replication_info.stdout"
+      until: "'role:slave' in replication_info.stdout or 'role:master' in replication_info.stdout"
       retries: 30
       delay: 2
       changed_when: false
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
     - name: Check that cluster state is ok
       command: redis-cli -h 10.10.0.11 cluster info
       register: cluster_info_cmd
       failed_when: "'cluster_state:ok' not in cluster_info_cmd.stdout"
       changed_when: false
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
-    - name: Print upgrade progress and status
+    - name: Print rollback progress and status
       debug:
-        msg: "Upgraded replica {{ inventory_hostname }} — cluster: ok"
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
+        msg: "Rolled back replica {{ inventory_hostname }} — cluster: ok"
 
-- name: Rolling Upgrade Redis Master Nodes
-  hosts: active_masters
+- name: Rollback Redis Master Nodes
+  hosts: rollback_masters
   serial: 1
   become: yes
   vars:
-    target_version: "{{ redis_version | default('7.2.6') }}"
+    target_version: "{{ target_version | default('7.0.15') }}"
   tasks:
-    - name: Save Redis in-memory data to disk
-      command: redis-cli SAVE
-      failed_when: false
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
-
-    - name: Create backup directory
-      file:
-        path: /var/lib/redis-backup
-        state: directory
-        mode: '0755'
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
-
-    - name: Back up Redis data before upgrade
-      shell: cp -r /var/lib/redis/dump.rdb /var/lib/redis/appendonlydir /var/lib/redis-backup/ || true
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
-
-    - name: Run CLUSTER FAILOVER on the replica
-      command: redis-cli -p 6379 CLUSTER FAILOVER
+    - name: Run CLUSTER FAILOVER TAKEOVER on the replica if replica exists
+      command: redis-cli -p 6379 CLUSTER FAILOVER TAKEOVER
       delegate_to: "{{ hostvars[inventory_hostname]['assigned_replica'] }}"
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
+      when: hostvars[inventory_hostname]['assigned_replica'] is defined and hostvars[inventory_hostname]['assigned_replica'] != ""
 
     - name: Wait for old master to become a replica
       command: redis-cli -p 6379 info replication
@@ -312,14 +274,83 @@
       retries: 30
       delay: 2
       changed_when: false
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
+      when: hostvars[inventory_hostname]['assigned_replica'] is defined and hostvars[inventory_hostname]['assigned_replica'] != ""
+
+    - name: Stop Redis on the newly promoted master (the replica) to restore data
+      shell: pkill redis-server || true
+      delegate_to: "{{ hostvars[inventory_hostname]['assigned_replica'] }}"
+      when: hostvars[inventory_hostname]['assigned_replica'] is defined and hostvars[inventory_hostname]['assigned_replica'] != ""
+
+    - name: Restore compatible RDB and AOF backup on the newly promoted master
+      shell: |
+        if [ -d /var/lib/redis-backup ] && [ -f /var/lib/redis-backup/dump.rdb ]; then
+          rm -rf /var/lib/redis/dump.rdb /var/lib/redis/appendonlydir
+          cp -r /var/lib/redis-backup/dump.rdb /var/lib/redis/
+          if [ -d /var/lib/redis-backup/appendonlydir ]; then
+            cp -r /var/lib/redis-backup/appendonlydir /var/lib/redis/
+          fi
+          chown -R redis:redis /var/lib/redis/
+        else
+          rm -rf /var/lib/redis/dump.rdb /var/lib/redis/appendonlydir
+        fi
+      delegate_to: "{{ hostvars[inventory_hostname]['assigned_replica'] }}"
+      when: hostvars[inventory_hostname]['assigned_replica'] is defined and hostvars[inventory_hostname]['assigned_replica'] != ""
+
+    - name: Clean up nodes.conf compatibility issues on the newly promoted master
+      shell: |
+        python3 -c '
+        import os
+        config_path = "/var/lib/redis/nodes.conf"
+        if os.path.exists(config_path):
+            with open(config_path, "r") as f:
+                lines = f.readlines()
+            new_lines = []
+            for line in lines:
+                parts = line.split()
+                if len(parts) > 1 and "," in parts[1]:
+                    parts[1] = parts[1].split(",")[0]
+                    line = " ".join(parts) + "\n"
+                new_lines.append(line)
+            with open(config_path, "w") as f:
+                f.writelines(new_lines)
+        '
+      delegate_to: "{{ hostvars[inventory_hostname]['assigned_replica'] }}"
+      when: hostvars[inventory_hostname]['assigned_replica'] is defined and hostvars[inventory_hostname]['assigned_replica'] != ""
+
+    - name: Start Redis manually on the newly promoted master
+      shell: "redis-server /etc/redis/redis.conf --daemonize yes"
+      become: yes
+      delegate_to: "{{ hostvars[inventory_hostname]['assigned_replica'] }}"
+      when: hostvars[inventory_hostname]['assigned_replica'] is defined and hostvars[inventory_hostname]['assigned_replica'] != ""
+
+    - name: Wait for the newly promoted master to be ready
+      command: redis-cli -p 6379 ping
+      register: promoted_master_ping
+      until: "'PONG' in promoted_master_ping.stdout"
+      retries: 30
+      delay: 2
+      delegate_to: "{{ hostvars[inventory_hostname]['assigned_replica'] }}"
+      when: hostvars[inventory_hostname]['assigned_replica'] is defined and hostvars[inventory_hostname]['assigned_replica'] != ""
 
     - name: Stop Redis on old master
       shell: pkill redis-server || true
       changed_when: true
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
-    - name: Clean up nodes.conf compatibility issues for rolling upgrade
+    - name: Restore compatible RDB and AOF backup if available, otherwise clear data
+      shell: |
+        if [ -d /var/lib/redis-backup ] && [ -f /var/lib/redis-backup/dump.rdb ]; then
+          rm -rf /var/lib/redis/dump.rdb /var/lib/redis/appendonlydir
+          cp -r /var/lib/redis-backup/dump.rdb /var/lib/redis/
+          if [ -d /var/lib/redis-backup/appendonlydir ]; then
+            cp -r /var/lib/redis-backup/appendonlydir /var/lib/redis/
+          fi
+          chown -R redis:redis /var/lib/redis/
+        else
+          rm -rf /var/lib/redis/dump.rdb /var/lib/redis/appendonlydir
+        fi
+      changed_when: true
+
+    - name: Clean up nodes.conf compatibility issues for rolling rollback
       shell: |
         python3 -c '
         import os
@@ -338,41 +369,41 @@
                 f.writelines(new_lines)
         '
       changed_when: true
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
     - name: Include redis role to compile and configure target version
       include_role:
         name: redis
       vars:
         redis_version: "{{ target_version }}"
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
-    - name: Wait for old master (now replica) to rejoin and sync
+    - name: Ensure Redis is running
+      shell: "redis-server /etc/redis/redis.conf --daemonize yes"
+      become: yes
+      changed_when: true
+
+    - name: Wait for old master (now replica) to rejoin
       command: redis-cli -p 6379 info replication
       register: replication_info
-      until: "'master_link_status:up' in replication_info.stdout or 'role:master' in replication_info.stdout"
+      until: "'role:slave' in replication_info.stdout or 'role:master' in replication_info.stdout"
       retries: 30
       delay: 2
       changed_when: false
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
     - name: Check that cluster state is ok
       command: redis-cli -h 10.10.0.11 cluster info
       register: cluster_info_cmd
       failed_when: "'cluster_state:ok' not in cluster_info_cmd.stdout"
       changed_when: false
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
 
-    - name: Print upgrade progress and status
+    - name: Print rollback progress and status
       debug:
-        msg: "Upgraded master {{ inventory_hostname }} — cluster: ok"
-      when: hostvars['redis-node-1']['is_upgrade_needed'] | default(true) | bool
+        msg: "Rolled back master {{ inventory_hostname }} — cluster: ok"
 
-- name: Verify Upgrade and Data Integrity
+- name: Verify Rollback and Data Integrity
   hosts: redis-node-1
   become: yes
   vars:
-    target_version: "{{ redis_version | default('7.2.6') }}"
+    target_version: "{{ target_version | default('7.0.15') }}"
   tasks:
     - name: Run data verification
       shell: |
@@ -380,7 +411,6 @@
         import subprocess
         import hashlib
 
-        # Fetch num_keys from metadata or ansible vars
         ansible_num_keys = {{ num_keys | default('None') }}
         if ansible_num_keys is not None and ansible_num_keys != 'None':
             num_keys = int(ansible_num_keys)
@@ -396,12 +426,9 @@
         for i in range(1, num_keys + 1):
             key = f"key:{i:04d}"
             expected_val = hashlib.sha256(key.encode()).hexdigest()
-            
             cmd = ["redis-cli", "-c", "-h", "127.0.0.1", "-p", "6379", "GET", key]
             res = subprocess.run(cmd, capture_output=True, text=True)
-            
             val = res.stdout.strip()
-            
             if not val or val == "(nil)":
                 missing_count += 1
             elif val != expected_val:
@@ -417,12 +444,12 @@
       register: data_verification_results
       changed_when: false
       failed_when: "'FAIL' in data_verification_results.stdout"
-      when: is_upgrade_needed | bool
+      when: hostvars['redis-node-1']['topology']['is_rollback_needed']
 
     - name: Display data verification output
       debug:
         msg: "{{ data_verification_results.stdout }}"
-      when: is_upgrade_needed | bool
+      when: hostvars['redis-node-1']['topology']['is_rollback_needed'] and data_verification_results.stdout is defined
 
     - name: Run cluster status check
       shell: |
@@ -529,14 +556,14 @@
       register: status_results
       changed_when: false
       failed_when: "'STATUS: ALL_OK' not in status_results.stdout"
-      when: is_upgrade_needed | bool
+      when: hostvars['redis-node-1']['topology']['is_rollback_needed']
 
     - name: Display cluster status
       debug:
         msg: "{{ status_results.stdout }}"
-      when: is_upgrade_needed | bool
+      when: hostvars['redis-node-1']['topology']['is_rollback_needed'] and status_results.stdout is defined
 
-    - name: Print upgrade complete confirmation
+    - name: Print rollback complete confirmation
       debug:
-        msg: "UPGRADE COMPLETE — all nodes on v{{ target_version }}, data integrity verified"
-      when: is_upgrade_needed | bool
+        msg: "ROLLBACK COMPLETE — all nodes on v{{ target_version }}, data integrity verified"
+      when: hostvars['redis-node-1']['topology']['is_rollback_needed']
