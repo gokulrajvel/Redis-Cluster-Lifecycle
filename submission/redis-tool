@@ -12,6 +12,9 @@ from datetime import datetime
 SUBMISSION_DIR = os.path.dirname(os.path.abspath(__file__))
 ANSIBLE_DIR = os.path.join(SUBMISSION_DIR, "ansible")
 
+# Set ANSIBLE_CONFIG explicitly in process environment to bypass world-writable directory checks
+os.environ["ANSIBLE_CONFIG"] = os.path.join(ANSIBLE_DIR, "ansible.cfg")
+
 # --- S5: Structured Logging Setup ---
 LOGS_DIR = os.path.join(SUBMISSION_DIR, "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
@@ -31,37 +34,49 @@ def check_prerequisites():
     runtime_name = None
     runtime_version = "unknown"
 
-    if runtime_env == "docker" and docker_exists:
-        runtime_name = "Docker"
+    # Detect if redis-node-1 is already running in one of the runtimes
+    is_docker_running = False
+    if docker_exists:
         try:
-            res = subprocess.run(["docker", "--version"], capture_output=True, text=True, check=True)
-            match = re.search(r'version\s+(\d+\.\d+\.\d+)', res.stdout)
-            if match:
-                runtime_version = match.group(1)
+            res = subprocess.run(["docker", "inspect", "redis-node-1"], capture_output=True, text=True)
+            if res.returncode == 0:
+                is_docker_running = True
         except Exception:
             pass
+
+    is_podman_running = False
+    if podman_exists:
+        try:
+            res = subprocess.run(["podman", "inspect", "redis-node-1"], capture_output=True, text=True)
+            if res.returncode == 0:
+                is_podman_running = True
+        except Exception:
+            pass
+
+    if is_docker_running:
+        runtime_name = "Docker"
+    elif is_podman_running:
+        runtime_name = "Podman"
+    elif runtime_env == "docker" and docker_exists:
+        runtime_name = "Docker"
     elif runtime_env == "podman" and podman_exists:
         runtime_name = "Podman"
-        try:
-            res = subprocess.run(["podman", "--version"], capture_output=True, text=True, check=True)
-            match = re.search(r'version\s+(\d+\.\d+\.\d+)', res.stdout)
-            if match:
-                runtime_version = match.group(1)
-        except Exception:
-            pass
+    elif docker_exists:  # Match up.sh default order of preference
+        runtime_name = "Docker"
     elif podman_exists:
         runtime_name = "Podman"
+
+    if runtime_name == "Docker":
         try:
-            res = subprocess.run(["podman", "--version"], capture_output=True, text=True, check=True)
+            res = subprocess.run(["docker", "--version"], capture_output=True, text=True, check=True)
             match = re.search(r'version\s+(\d+\.\d+\.\d+)', res.stdout)
             if match:
                 runtime_version = match.group(1)
         except Exception:
             pass
-    elif docker_exists:
-        runtime_name = "Docker"
+    elif runtime_name == "Podman":
         try:
-            res = subprocess.run(["docker", "--version"], capture_output=True, text=True, check=True)
+            res = subprocess.run(["podman", "--version"], capture_output=True, text=True, check=True)
             match = re.search(r'version\s+(\d+\.\d+\.\d+)', res.stdout)
             if match:
                 runtime_version = match.group(1)
@@ -326,18 +341,30 @@ def main():
             command_name = "scale_out"
             args_dict = {"add_nodes": args.add_nodes}
 
-            # Step 1: Start new node containers via podman-compose
+            # Step 1: Start new node containers via podman-compose / docker compose
             infra_dir = os.path.join(SUBMISSION_DIR, "infra")
             print("Starting new node containers (redis-node-7, redis-node-8)...")
 
-            # Try podman-compose first, then docker-compose
+            # Try to detect which container runtime is hosting the existing nodes
+            is_docker_running = False
+            if shutil.which("docker"):
+                try:
+                    res = subprocess.run(["docker", "inspect", "redis-node-1"], capture_output=True, text=True)
+                    if res.returncode == 0:
+                        is_docker_running = True
+                except Exception:
+                    pass
+
             compose_cmd = None
-            if shutil.which("podman-compose"):
-                compose_cmd = ["podman-compose", "up", "-d", "redis-node-7", "redis-node-8"]
-            elif shutil.which("podman") and shutil.which("podman"):
-                compose_cmd = ["podman", "compose", "up", "-d", "redis-node-7", "redis-node-8"]
-            elif shutil.which("docker"):
+            if is_docker_running:
                 compose_cmd = ["docker", "compose", "up", "-d", "redis-node-7", "redis-node-8"]
+            else:
+                if shutil.which("podman-compose"):
+                    compose_cmd = ["podman-compose", "up", "-d", "redis-node-7", "redis-node-8"]
+                elif shutil.which("podman"):
+                    compose_cmd = ["podman", "compose", "up", "-d", "redis-node-7", "redis-node-8"]
+                elif shutil.which("docker"):
+                    compose_cmd = ["docker", "compose", "up", "-d", "redis-node-7", "redis-node-8"]
 
             if compose_cmd:
                 compose_result = subprocess.run(compose_cmd, cwd=infra_dir, capture_output=True, text=True)
