@@ -5,6 +5,7 @@ import shutil
 import re
 import subprocess
 import json
+import stat
 import time
 from datetime import datetime
 
@@ -20,8 +21,18 @@ LOGS_DIR = os.path.join(SUBMISSION_DIR, "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 # --- End S5 Setup ---
 
+def fix_ansible_permissions():
+    """Fix world-writable directory issue for ansible.cfg."""
+    current = os.stat(ANSIBLE_DIR).st_mode
+    # Remove world-write permission
+    fixed = current & ~stat.S_IWOTH
+    if current != fixed:
+        os.chmod(ANSIBLE_DIR, fixed)
+        print("Fixed ansible directory permissions.")
+
 def check_prerequisites():
     """Verify Docker/Podman and Ansible 2.14+ are installed on the system."""
+    fix_ansible_permissions()
     import shutil
     import subprocess
     import re
