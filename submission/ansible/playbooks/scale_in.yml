@@ -61,17 +61,7 @@
             replica_ip_port = replica_node[1].split("@")[0].split(",")[0]
             replica_ip = replica_ip_port.split(":")[0]
 
-        # Determine mapping to ansible hosts based on IP addresses
-        ip_to_host = {
-            "10.10.0.11": "redis-node-1",
-            "10.10.0.12": "redis-node-2",
-            "10.10.0.13": "redis-node-3",
-            "10.10.0.14": "redis-node-4",
-            "10.10.0.15": "redis-node-5",
-            "10.10.0.16": "redis-node-6",
-            "10.10.0.17": "redis-node-7",
-            "10.10.0.18": "redis-node-8"
-        }
+        ip_to_host = {f"10.10.0.{10+i}": f"redis-node-{i}" for i in range(1, 200)}
 
         master_host = ip_to_host.get(master_ip)
         replica_host = ip_to_host.get(replica_ip) if replica_ip else None

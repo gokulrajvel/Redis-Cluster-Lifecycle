@@ -10,55 +10,78 @@
   hosts: cluster_master
   become: yes
   tasks:
-    - name: Wait for redis-node-7 to be ready
-      command: redis-cli -h 10.10.0.17 -p 6379 ping
-      register: ping7
-      until: "'PONG' in ping7.stdout"
+    - name: Check existing cluster nodes
+      command: redis-cli -h 10.10.0.11 -p 6379 cluster nodes
+      register: cluster_nodes_out
+      changed_when: false
+
+    - name: Calculate master and replica lists from new_nodes group
+      set_fact:
+        new_masters: "{{ groups['new_nodes'][:(groups['new_nodes'] | length // 2)] }}"
+        new_replicas: "{{ groups['new_nodes'][(groups['new_nodes'] | length // 2):] }}"
+
+    - name: Wait for new nodes to be ready
+      command: "redis-cli -h {{ '10.10.0.' ~ (item | regex_replace('redis-node-', '') | int + 10) }} -p 6379 ping"
+      register: ping_new
+      until: "'PONG' in ping_new.stdout"
       retries: 30
       delay: 2
       changed_when: false
+      loop: "{{ groups['new_nodes'] }}"
 
-    - name: Wait for redis-node-8 to be ready
-      command: redis-cli -h 10.10.0.18 -p 6379 ping
-      register: ping8
-      until: "'PONG' in ping8.stdout"
-      retries: 30
-      delay: 2
-      changed_when: false
-
-    - name: Add redis-node-7 (10.10.0.17:6379) to cluster as master
-      command: redis-cli --cluster add-node 10.10.0.17:6379 10.10.0.11:6379
-      register: add_master_out
+    - name: Add new master nodes to cluster
+      command: >
+        redis-cli --cluster add-node
+        {{ "10.10.0." ~ (item | regex_replace('redis-node-', '') | int + 10) }}:6379
+        10.10.0.11:6379
+      when: '("10.10.0." ~ (item | regex_replace("redis-node-", "") | int + 10) ~ ":6379") not in cluster_nodes_out.stdout'
+      loop: "{{ new_masters }}"
+      register: add_masters_result
       changed_when: true
 
-    - name: Wait for cluster to acknowledge the new master
+    - name: Wait for cluster to acknowledge new masters
       pause:
         seconds: 5
+      when: add_masters_result.changed | default(false)
 
-    - name: Fetch node ID of the newly added master (redis-node-7)
-      command: redis-cli -h 10.10.0.17 -p 6379 cluster myid
-      register: new_master_id
+    - name: Fetch node IDs of new masters
+      command: >
+        redis-cli -h
+        {{ "10.10.0." ~ (item | regex_replace('redis-node-', '') | int + 10) }}
+        -p 6379 cluster myid
+      loop: "{{ new_masters }}"
+      register: master_ids_result
       changed_when: false
 
-    - name: Add redis-node-8 (10.10.0.18:6379) as replica of redis-node-7
+    - name: Add new replica nodes to cluster
       command: >
-        redis-cli --cluster add-node 10.10.0.18:6379 10.10.0.11:6379
-        --cluster-slave --cluster-master-id {{ new_master_id.stdout | trim }}
-      register: add_replica_out
+        redis-cli --cluster add-node
+        {{ "10.10.0." ~ (new_replicas[loop_idx] | regex_replace('redis-node-', '') | int + 10) }}:6379
+        10.10.0.11:6379
+        --cluster-slave
+        --cluster-master-id {{ master_ids_result.results[loop_idx].stdout | trim }}
+      when: '("10.10.0." ~ (new_replicas[loop_idx] | regex_replace("redis-node-", "") | int + 10) ~ ":6379") not in cluster_nodes_out.stdout'
+      loop: "{{ new_masters }}"
+      loop_control:
+        index_var: loop_idx
+      register: add_replicas_result
       changed_when: true
 
     - name: Wait for topology to propagate
       pause:
         seconds: 5
+      when: add_replicas_result.changed | default(false)
 
-    - name: Rebalance hash slots across all masters (including the new empty one)
+    - name: Rebalance hash slots across all masters (including the new empty ones)
       command: redis-cli --cluster rebalance 10.10.0.11:6379 --cluster-use-empty-masters
       register: rebalance_out
+      when: add_masters_result.changed | default(false)
       changed_when: true
 
     - name: Display rebalance result
       debug:
         msg: "{{ rebalance_out.stdout }}"
+      when: rebalance_out is not skipped
 
     - name: Show final cluster topology
       command: redis-cli -h 10.10.0.11 -p 6379 cluster nodes

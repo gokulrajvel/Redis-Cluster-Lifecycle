@@ -16,6 +16,16 @@ ANSIBLE_DIR = os.path.join(SUBMISSION_DIR, "ansible")
 # Set ANSIBLE_CONFIG explicitly in process environment to bypass world-writable directory checks
 os.environ["ANSIBLE_CONFIG"] = os.path.join(ANSIBLE_DIR, "ansible.cfg")
 
+# Dynamic DOCKER_CONTEXT detection:
+# If DOCKER_CONTEXT is not set, check if default context has redis-node-1 running.
+if "DOCKER_CONTEXT" not in os.environ:
+    try:
+        res = subprocess.run(["docker", "--context", "default", "inspect", "redis-node-1"], capture_output=True, text=True)
+        if res.returncode == 0:
+            os.environ["DOCKER_CONTEXT"] = "default"
+    except Exception:
+        pass
+
 # --- S5: Structured Logging Setup ---
 LOGS_DIR = os.path.join(SUBMISSION_DIR, "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
@@ -213,8 +223,114 @@ def write_structured_log(command_name, args_dict, ansible_cmd, return_code, dura
     return json_log_path
 # --- End S5 Structured Logging Functions ---
 
+def get_current_nodes():
+    hosts_ini_path = os.path.join(SUBMISSION_DIR, "ansible", "inventory", "hosts.ini")
+    current_nodes = []
+    if os.path.exists(hosts_ini_path):
+        with open(hosts_ini_path, "r") as f:
+            lines = f.readlines()
+        in_redis_nodes = False
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("["):
+                if line == "[redis_nodes]":
+                    in_redis_nodes = True
+                else:
+                    in_redis_nodes = False
+                continue
+            if in_redis_nodes:
+                node_name = line.split()[0]
+                current_nodes.append(node_name)
+    if not current_nodes:
+        current_nodes = [f"redis-node-{i}" for i in range(1, 7)]
+    return current_nodes
+
+def update_compose_yml(new_nodes):
+    compose_path = os.path.join(SUBMISSION_DIR, "infra", "compose.yml")
+    with open(compose_path, "r") as f:
+        content = f.read()
+
+    updated = False
+    for node in new_nodes:
+        if node not in content:
+            k = int(node.split("-")[-1])
+            service_snippet = f"""  redis-node-{k}:
+    image: redis-node-base:latest
+    container_name: redis-node-{k}
+    hostname: redis-node-{k}
+    networks:
+      redis-net:
+        ipv4_address: 10.10.0.{10 + k}
+    ports:
+      - "{2300 + k}:22"
+      - "{6470 + k}:6379"
+
+"""
+            # Insert right before root-level networks: block
+            networks_idx = content.rfind("\nnetworks:")
+            if networks_idx == -1:
+                networks_idx = content.rfind("networks:")
+            if networks_idx != -1:
+                content = content[:networks_idx] + "\n" + service_snippet + content[networks_idx:]
+                updated = True
+
+    if updated:
+        with open(compose_path, "w") as f:
+            f.write(content)
+        print("Updated compose.yml with new services.")
+
+def update_hosts_ini(current_nodes, new_nodes):
+    hosts_ini_path = os.path.join(SUBMISSION_DIR, "ansible", "inventory", "hosts.ini")
+    
+    redis_nodes_lines = ["[redis_nodes]"]
+    for node in current_nodes:
+        k = int(node.split("-")[-1])
+        redis_nodes_lines.append(f"{node} ansible_host=127.0.0.1 ansible_port={2300 + k}")
+        
+    new_nodes_lines = ["[new_nodes]"]
+    for node in new_nodes:
+        k = int(node.split("-")[-1])
+        new_nodes_lines.append(f"{node} ansible_host=127.0.0.1 ansible_port={2300 + k}")
+        
+    content = "\n".join(redis_nodes_lines) + "\n\n" + "\n".join(new_nodes_lines) + "\n\n"
+    content += "[cluster_master]\nredis-node-1 ansible_host=127.0.0.1 ansible_port=2301\n\n"
+    content += """[all:vars]
+ansible_user=root
+ansible_ssh_private_key_file=../infra/id_rsa
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+"""
+    with open(hosts_ini_path, "w") as f:
+        f.write(content)
+    print("Updated hosts.ini with temporary scale groups.")
+
+def finalize_hosts_ini(current_nodes, new_nodes):
+    hosts_ini_path = os.path.join(SUBMISSION_DIR, "ansible", "inventory", "hosts.ini")
+    all_nodes = current_nodes + new_nodes
+    
+    redis_nodes_lines = ["[redis_nodes]"]
+    for node in all_nodes:
+        k = int(node.split("-")[-1])
+        redis_nodes_lines.append(f"{node} ansible_host=127.0.0.1 ansible_port={2300 + k}")
+        
+    new_nodes_lines = ["[new_nodes]"]
+        
+    content = "\n".join(redis_nodes_lines) + "\n\n" + "\n".join(new_nodes_lines) + "\n\n"
+    content += "[cluster_master]\nredis-node-1 ansible_host=127.0.0.1 ansible_port=2301\n\n"
+    content += """[all:vars]
+ansible_user=root
+ansible_ssh_private_key_file=../infra/id_rsa
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+"""
+    with open(hosts_ini_path, "w") as f:
+        f.write(content)
+    print("Finalized hosts.ini (moved new nodes to active list).")
+
 def main():
     check_prerequisites()
+    current_nodes = []
+    new_nodes = []
 
     import argparse
     parser = argparse.ArgumentParser(description="Redis Cluster Management CLI Tool")
@@ -253,7 +369,7 @@ def main():
     # 6. scale
     scale_parser = subparsers.add_parser("scale", help="Scale the Redis Cluster")
     scale_group = scale_parser.add_mutually_exclusive_group(required=True)
-    scale_group.add_argument("--add-nodes", type=int, choices=[2], help="Number of nodes to add (must be 2)")
+    scale_group.add_argument("--add-nodes", type=int, help="Number of nodes to add (must be an even number)")
     scale_group.add_argument("--remove-node", help="Node ID of the master node to remove")
 
     # 7. rollback
@@ -262,6 +378,11 @@ def main():
     rollback_parser.add_argument("--keys", type=int, help="Number of keys to verify during baseline and final checks (defaults to metadata:num_keys or 1000)")
 
     args = parser.parse_args()
+
+    if args.command == "scale" and args.add_nodes is not None:
+        if args.add_nodes < 2 or args.add_nodes % 2 != 0:
+            print("Error: --add-nodes must be a positive even integer.")
+            sys.exit(1)
 
     # --- S5: Capture start time and build args dict for logging ---
     start_time = time.time()
@@ -352,9 +473,18 @@ def main():
             command_name = "scale_out"
             args_dict = {"add_nodes": args.add_nodes}
 
+            # Step 0: Get current nodes and calculate new nodes
+            current_nodes = get_current_nodes()
+            M = len(current_nodes)
+            new_nodes = [f"redis-node-{i}" for i in range(M + 1, M + 1 + args.add_nodes)]
+
+            # Step 0.5: Update compose.yml and hosts.ini
+            update_compose_yml(new_nodes)
+            update_hosts_ini(current_nodes, new_nodes)
+
             # Step 1: Start new node containers via podman-compose / docker compose
             infra_dir = os.path.join(SUBMISSION_DIR, "infra")
-            print("Starting new node containers (redis-node-7, redis-node-8)...")
+            print(f"Starting new node containers ({', '.join(new_nodes)})...")
 
             # Try to detect which container runtime is hosting the existing nodes
             is_docker_running = False
@@ -368,14 +498,14 @@ def main():
 
             compose_cmd = None
             if is_docker_running:
-                compose_cmd = ["docker", "compose", "up", "-d", "redis-node-7", "redis-node-8"]
+                compose_cmd = ["docker", "compose", "up", "-d"] + new_nodes
             else:
                 if shutil.which("podman-compose"):
-                    compose_cmd = ["podman-compose", "up", "-d", "redis-node-7", "redis-node-8"]
+                    compose_cmd = ["podman-compose", "up", "-d"] + new_nodes
                 elif shutil.which("podman"):
-                    compose_cmd = ["podman", "compose", "up", "-d", "redis-node-7", "redis-node-8"]
+                    compose_cmd = ["podman", "compose", "up", "-d"] + new_nodes
                 elif shutil.which("docker"):
-                    compose_cmd = ["docker", "compose", "up", "-d", "redis-node-7", "redis-node-8"]
+                    compose_cmd = ["docker", "compose", "up", "-d"] + new_nodes
 
             if compose_cmd:
                 compose_result = subprocess.run(compose_cmd, cwd=infra_dir, capture_output=True, text=True)
@@ -393,7 +523,9 @@ def main():
             # Step 2: Wait for SSH to be ready on new nodes
             import socket
             print("Waiting for SSH on new nodes...")
-            for port in [2307, 2308]:
+            for node in new_nodes:
+                k = int(node.split("-")[-1])
+                port = 2300 + k
                 for attempt in range(30):
                     try:
                         s = socket.create_connection(("127.0.0.1", port), timeout=2)
@@ -459,6 +591,10 @@ def main():
 
     # Execute
     return_code = run_playbook(cmd, log_filename)
+
+    # Finalize inventory if scale_out succeeded
+    if return_code == 0 and args.command == "scale" and args.add_nodes:
+        finalize_hosts_ini(current_nodes, new_nodes)
 
     # --- S5: Write structured log after execution ---
     duration = time.time() - start_time

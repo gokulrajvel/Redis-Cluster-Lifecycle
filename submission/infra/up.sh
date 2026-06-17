@@ -15,14 +15,14 @@ fi
 # Detect container runtime and start compose
 if command -v docker &> /dev/null; then
   echo "Starting infrastructure using Docker..."
-  docker compose up -d --build
+  docker compose up -d --build redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5 redis-node-6
 elif command -v podman &> /dev/null; then
   if command -v podman-compose &> /dev/null; then
     echo "Starting infrastructure using Podman Compose..."
-    podman-compose up -d --build
+    podman-compose up -d --build redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5 redis-node-6
   else
     echo "Starting infrastructure using Podman..."
-    podman compose up -d --build
+    podman compose up -d --build redis-node-1 redis-node-2 redis-node-3 redis-node-4 redis-node-5 redis-node-6
   fi
 else
   echo "Error: Neither Docker nor Podman is installed. Please install a container engine."
